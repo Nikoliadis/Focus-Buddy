@@ -20,14 +20,12 @@
 
   <header class="header">
     <nav class="navbar" aria-label="Main navigation">
-      <a class="logo" href="{{ url_for('home') }}">FocusBuddy</a>
+      <a class="logo" href="{{ url_for('main.home') }}">FocusBuddy</a>
 
-      <ul class="nav-links">
-        <li>
-          <a href="{{ url_for('home') }}"
-             class="{% if request.endpoint == 'home' %}active{% endif %}">
-            Home
-          </a>
+      <a href="{{ url_for('main.home') }}"
+        class="{% if request.endpoint == 'main.home' %}active{% endif %}">
+        Home
+      </a>
         </li>
         <li><a href="#" aria-disabled="true">Login</a></li>
         <li><a href="#" aria-disabled="true">Register</a></li>

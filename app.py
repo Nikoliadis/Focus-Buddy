@@ -1,6 +1,8 @@
 from datetime import datetime
-from flask import Flask, render_template
+from flask import Flask
 from config import Config
+
+from main import main_bp
 
 
 def create_app() -> Flask:
@@ -11,9 +13,7 @@ def create_app() -> Flask:
     def inject_globals():
         return {"year": datetime.now().year}
 
-    @app.get("/")
-    def home():
-        return render_template("home.html")
+    app.register_blueprint(main_bp)
 
     return app
 
