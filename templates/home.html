@@ -1,0 +1,39 @@
+{% extends "base.html" %}
+
+{% block title %}Home | FocusBuddy{% endblock %}
+
+{% block content %}
+<section class="hero">
+  <div class="container">
+    <h1>Study Better. Together.</h1>
+    <p>
+      Real-time focus rooms, a synchronized Pomodoro timer, and productivity insights—
+      built for students and study groups.
+    </p>
+
+    <div class="actions">
+      <a class="btn primary" href="#">Get Started</a>
+      <a class="btn secondary" href="#features">Learn More</a>
+    </div>
+  </div>
+</section>
+
+<section id="features" class="features">
+  <div class="container grid">
+    <article class="card">
+      <h3>Real-Time Focus Rooms</h3>
+      <p>Create or join rooms and focus together with live presence.</p>
+    </article>
+
+    <article class="card">
+      <h3>Synchronized Pomodoro</h3>
+      <p>Everyone sees the same timer—start, pause, and reset as a group.</p>
+    </article>
+
+    <article class="card">
+      <h3>Productivity Insights</h3>
+      <p>Track focus time and completed sessions at individual and group level.</p>
+    </article>
+  </div>
+</section>
+{% endblock %}
