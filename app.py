@@ -1,6 +1,7 @@
 from dotenv import load_dotenv
 load_dotenv()
 
+from auth import auth_bp
 from datetime import datetime
 from flask import Flask
 from config import Config
@@ -21,6 +22,7 @@ def create_app() -> Flask:
         return {"year": datetime.now().year}
 
     app.register_blueprint(main_bp)
+    app.register_blueprint(auth_bp)
 
     with app.app_context():
         db.create_all()
@@ -29,6 +31,7 @@ def create_app() -> Flask:
 
 
 app = create_app()
+
 
 if __name__ == "__main__":
     app.run(debug=True)

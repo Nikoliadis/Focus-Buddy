@@ -19,21 +19,49 @@
   <a class="skip-link" href="#main">Skip to content</a>
 
   <header class="header">
-    <nav class="navbar" aria-label="Main navigation">
+    <nav class="navbar container" aria-label="Main navigation">
       <a class="logo" href="{{ url_for('main.home') }}">FocusBuddy</a>
 
-      <a href="{{ url_for('main.home') }}"
-        class="{% if request.endpoint == 'main.home' %}active{% endif %}">
-        Home
-      </a>
+      <ul class="nav-links">
+        <li>
+          <a href="{{ url_for('main.home') }}"
+             class="{% if request.endpoint == 'main.home' %}active{% endif %}">
+            Home
+          </a>
         </li>
-        <li><a href="#" aria-disabled="true">Login</a></li>
-        <li><a href="#" aria-disabled="true">Register</a></li>
+
+        {% if session.get('user_id') %}
+          <li class="nav-hello">Hi, {{ session.get('username') }}</li>
+          <li><a href="{{ url_for('auth.logout') }}">Logout</a></li>
+        {% else %}
+          <li>
+            <a href="{{ url_for('auth.login_page') }}"
+               class="{% if request.endpoint in ['auth.login_page', 'auth.login_post'] %}active{% endif %}">
+              Login
+            </a>
+          </li>
+          <li>
+            <a href="{{ url_for('auth.register_page') }}"
+               class="{% if request.endpoint in ['auth.register_page', 'auth.register_post'] %}active{% endif %}">
+              Register
+            </a>
+          </li>
+        {% endif %}
       </ul>
     </nav>
   </header>
 
-  <main id="main">
+  <main id="main" class="container">
+    {% with messages = get_flashed_messages(with_categories=true) %}
+      {% if messages %}
+        <div class="flashes" role="status" aria-live="polite">
+          {% for category, msg in messages %}
+            <div class="flash flash-{{ category }}">{{ msg }}</div>
+          {% endfor %}
+        </div>
+      {% endif %}
+    {% endwith %}
+
     {% block content %}{% endblock %}
   </main>
 
