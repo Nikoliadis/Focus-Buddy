@@ -5,18 +5,22 @@
 <section class="auth-card">
   <h1>Register</h1>
 
-  <form method="post" action="{{ url_for('auth.register_post') }}">
-    <label for="username">Username</label>
-    <input id="username" name="username" autocomplete="username" required>
+<form method="post" action="{{ url_for('auth.register_post') }}">
+  <label for="username">Username</label>
+  <input id="username" name="username" autocomplete="username" required>
 
-    <label for="password">Password</label>
-    <input id="password" name="password" type="password" autocomplete="new-password" required>
+  <label for="email">Email</label>
+  <input id="email" name="email" type="email" autocomplete="email" required>
 
-    <label for="confirm">Confirm Password</label>
-    <input id="confirm" name="confirm" type="password" autocomplete="new-password" required>
+  <label for="password">Password</label>
+  <input id="password" name="password" type="password" autocomplete="new-password" required>
 
-    <button class="btn primary" type="submit">Create account</button>
-  </form>
+  <label for="confirm">Confirm Password</label>
+  <input id="confirm" name="confirm" type="password" autocomplete="new-password" required>
+
+  <button class="btn primary" type="submit">Create account</button>
+</form>
+
 
   <p class="muted">
     Already have an account?

@@ -6,8 +6,9 @@
   <h1>Login</h1>
 
   <form method="post" action="{{ url_for('auth.login_post') }}">
-    <label for="username">Username</label>
-    <input id="username" name="username" autocomplete="username" required>
+    <label for="login">Username or Email</label>
+    <input id="login" name="login" autocomplete="username" required>
+
 
     <label for="password">Password</label>
     <input id="password" name="password" type="password" autocomplete="current-password" required>

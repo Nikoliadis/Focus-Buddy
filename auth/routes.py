@@ -3,7 +3,7 @@ from __future__ import annotations
 from flask import render_template, request, redirect, url_for, flash, session
 
 from . import auth_bp
-from .service import find_user_by_username, create_user, verify_password
+from .service import find_user_by_login, create_user, verify_password, user_exists
 
 
 @auth_bp.get("/login")
@@ -15,17 +15,16 @@ def login_page():
 
 @auth_bp.post("/login")
 def login_post():
-    username = (request.form.get("username") or "").strip()
+    login = (request.form.get("login") or "").strip()
     password = request.form.get("password") or ""
 
-    user = find_user_by_username(username)
+    user = find_user_by_login(login)
     if not user or not verify_password(user, password):
-        flash("Invalid username or password.", "error")
+        flash("Invalid username/email or password.", "error")
         return redirect(url_for("auth.login_page"))
 
     session["user_id"] = user.id
     session["username"] = user.username
-    flash("Logged in successfully ✅", "success")
     return redirect(url_for("main.home"))
 
 
@@ -39,12 +38,17 @@ def register_page():
 @auth_bp.post("/register")
 def register_post():
     username = (request.form.get("username") or "").strip()
+    email = (request.form.get("email") or "").strip()
     password = request.form.get("password") or ""
     confirm = request.form.get("confirm") or ""
 
     # minimal validation (fast + safe)
     if len(username) < 3:
         flash("Username must be at least 3 characters.", "error")
+        return redirect(url_for("auth.register_page"))
+
+    if "@" not in email or "." not in email:
+        flash("Please enter a valid email address.", "error")
         return redirect(url_for("auth.register_page"))
 
     if len(password) < 6:
@@ -55,11 +59,11 @@ def register_post():
         flash("Passwords do not match.", "error")
         return redirect(url_for("auth.register_page"))
 
-    if find_user_by_username(username):
-        flash("Username already exists.", "error")
+    if user_exists(username, email):
+        flash("Username or email already exists.", "error")
         return redirect(url_for("auth.register_page"))
 
-    user = create_user(username, password)
+    user = create_user(username, email, password)
     session["user_id"] = user.id
     session["username"] = user.username
     flash("Account created ✅", "success")
@@ -70,5 +74,4 @@ def register_post():
 def logout():
     session.pop("user_id", None)
     session.pop("username", None)
-    flash("Logged out.", "info")
     return redirect(url_for("main.home"))
