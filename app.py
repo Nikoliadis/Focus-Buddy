@@ -1,11 +1,13 @@
+from dotenv import load_dotenv
+load_dotenv()
+
 from datetime import datetime
 from flask import Flask
 from config import Config
-
 from main.db import db
 from main import main_bp
+from models.user import User 
 
-from models.user import User
 
 
 def create_app() -> Flask:
