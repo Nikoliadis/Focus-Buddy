@@ -4,6 +4,8 @@
 {% block content %}
 <section class="hero">
   <h1>Your Rooms</h1>
+  <p class="muted">Create a room or join using an invite code.</p>
+
   <div class="actions">
     <a class="btn primary" href="{{ url_for('rooms.rooms_create_page') }}">Create Room</a>
     <a class="btn secondary" href="{{ url_for('rooms.rooms_join_page') }}">Join with Code</a>
@@ -15,13 +17,25 @@
     <div class="grid">
       {% for room in rooms %}
         <div class="card">
-          <h3>{{ room.name }}</h3>
+          <h3 style="margin-top:0;">{{ room.name }}</h3>
+
           {% if room.join_code %}
             <p class="muted">Code: <strong>{{ room.join_code }}</strong></p>
           {% else %}
             <p class="muted">No join code</p>
           {% endif %}
-          <a class="btn secondary" href="{{ url_for('rooms.room_detail', room_id=room.id) }}">Open</a>
+
+          <div class="actions" style="margin-top:.75rem;">
+            <a class="btn secondary" href="{{ url_for('rooms.room_detail', room_id=room.id) }}">Open</a>
+            {% if room.owner_id == session.get('user_id') %}
+              <form method="post" action="{{ url_for('rooms.room_delete', room_id=room.id) }}" style="margin:0;">
+                <button class="btn secondary" type="submit"
+                        onclick="return confirm('Delete this room? This cannot be undone.');">
+                  Delete
+                </button>
+              </form>
+            {% endif %}
+          </div>
         </div>
       {% endfor %}
     </div>

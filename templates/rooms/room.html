@@ -3,26 +3,89 @@
 
 {% block content %}
 <section class="auth-card">
-  <h1>{{ room.name }}</h1>
+  <h1 style="margin-bottom:.25rem;">
+    {{ room.name }}
+    {% if is_owner %}
+      <span class="muted" style="font-size:.95rem;">(Owner)</span>
+    {% endif %}
+  </h1>
 
   <p class="muted">
     Room ID: <strong>#{{ room.id }}</strong> · Members: <strong>{{ member_count }}</strong>
   </p>
 
   {% if room.join_code %}
-    <div class="card" style="margin-top: 1rem;">
-      <h3 style="margin:0 0 .5rem;">Join Code</h3>
-      <p style="margin:0; font-size:1.1rem; letter-spacing:.08em;">
-        <strong>{{ room.join_code }}</strong>
-      </p>
-      <p class="muted" style="margin:.5rem 0 0;">
-        Share this code with friends so they can join your room.
-      </p>
-    </div>
-  {% endif %}
+  <div class="card" style="margin-top: 1rem;">
+    <h3 style="margin:0 0 .5rem;">Invite</h3>
 
-  <div class="actions" style="margin-top: 1.25rem;">
+    <p style="margin:0 0 .5rem;">
+      Join code:
+      <strong style="letter-spacing:.08em;">
+        {{ room.join_code }}
+      </strong>
+    </p>
+
+    {% if invite_link %}
+      <div style="display:flex; gap:.5rem; flex-wrap:wrap;">
+        <input
+          type="text"
+          value="{{ invite_link }}"
+          id="inviteLink"
+          readonly
+          style="flex:1; padding:.6rem; border-radius:.6rem; border:1px solid rgba(255,255,255,.15); background:rgba(255,255,255,.05); color:#fff;"
+        />
+
+        <button
+          class="btn secondary"
+          type="button"
+          onclick="copyInviteLink()"
+        >
+          Copy Link
+        </button>
+      </div>
+    {% endif %}
+  </div>
+{% endif %}
+
+  <div class="card" style="margin-top: 1rem;">
+    <h3 style="margin:0 0 .75rem;">Members</h3>
+
+    <ul style="list-style:none; padding:0; margin:0; display:grid; gap:.45rem;">
+      {% for user, is_room_owner in members %}
+        <li style="display:flex; align-items:center; justify-content:space-between;">
+          <span>
+            {{ user.username | title }}
+            {% if is_room_owner %}
+              <strong style="margin-left:.35rem;">👑</strong>
+            {% endif %}
+          </span>
+        </li>
+      {% endfor %}
+    </ul>
+  </div>
+
+  <div class="actions" style="margin-top: 1.25rem; flex-wrap: wrap;">
     <a class="btn secondary" href="{{ url_for('rooms.rooms_index') }}">Back to Rooms</a>
+
+    {% if is_owner %}
+      <form method="post"
+        action="{{ url_for('rooms.room_delete', room_id=room.id) }}"
+        style="margin:0;">
+      <button class="btn danger minimal"
+          type="submit"
+          onclick="return confirm('Delete this room? This cannot be undone.');">
+        Delete
+      </button>
+      </form>
+    {% else %}
+      <form method="post" action="{{ url_for('rooms.room_leave', room_id=room.id) }}" style="margin:0;">
+        <button class="btn secondary" type="submit"
+                onclick="return confirm('Leave this room?');">
+          Leave Room
+        </button>
+      </form>
+    {% endif %}
+
     <a class="btn primary" href="#" aria-disabled="true">Start Focus Session (soon)</a>
   </div>
 </section>

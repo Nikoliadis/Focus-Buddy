@@ -1,24 +1,28 @@
 {% extends "base.html" %}
-{% block title %}Login | FocusBuddy{% endblock %}
+{% block title %}Register | FocusBuddy{% endblock %}
 
 {% block content %}
 <section class="auth-card">
-  <h1>Login</h1>
+  <h1>Register</h1>
 
-  <form method="post" action="{{ url_for('auth.login_post') }}">
-    <input type="hidden" name="next" value="{{ next or '' }}">
+  <form method="post" action="{{ url_for('auth.register_post') }}">
+    <label for="username">Username</label>
+    <input id="username" name="username" autocomplete="username" required>
 
-    <label for="identifier">Username or Email</label>
-    <input id="identifier" name="identifier" autocomplete="username" required>
+    <label for="email">Email</label>
+    <input id="email" name="email" type="email" autocomplete="email" required>
 
     <label for="password">Password</label>
-    <input id="password" name="password" type="password" autocomplete="current-password" required>
+    <input id="password" name="password" type="password" autocomplete="new-password" required>
 
-    <button class="btn primary" type="submit">Sign in</button>
+    <label for="confirm">Confirm Password</label>
+    <input id="confirm" name="confirm" type="password" autocomplete="new-password" required>
+
+    <button class="btn primary" type="submit">Create account</button>
   </form>
 
   <p class="muted" style="margin-top:1rem;">
-    Don’t have an account? <a href="{{ url_for('auth.register_page') }}">Register</a>
+    Already have an account? <a href="{{ url_for('auth.login_page') }}">Login</a>
   </p>
 </section>
 {% endblock %}

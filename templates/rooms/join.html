@@ -4,10 +4,15 @@
 {% block content %}
 <section class="auth-card">
   <h1>Join Room</h1>
+
   <form method="post" action="{{ url_for('rooms.rooms_join_post') }}">
     <label for="code">Room code</label>
-    <input id="code" name="code" required>
+    <input id="code" name="code" required value="{{ prefill_code or '' }}" />
     <button class="btn primary" type="submit">Join</button>
   </form>
+
+  <p class="muted" style="margin-top:1rem;">
+    Tip: If someone sends you an invite link, it will auto-fill the code here.
+  </p>
 </section>
 {% endblock %}

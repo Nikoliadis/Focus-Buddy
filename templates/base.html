@@ -76,6 +76,7 @@
 
   <script>
     window.addEventListener("DOMContentLoaded", () => {
+
       const flashes = document.querySelectorAll(".flash");
 
       flashes.forEach(f => {
@@ -107,7 +108,27 @@
           btn.textContent = "Loading…";
         });
       });
+
     });
+
+    function copyInviteLink() {
+      const input = document.getElementById("inviteLink");
+      if (!input) return;
+
+      navigator.clipboard.writeText(input.value).then(() => {
+        const toast = document.createElement("div");
+        toast.className = "flash flash-success";
+        toast.innerText = "Invite link copied ✅";
+
+        const container = document.querySelector(".flashes") || document.body;
+        container.appendChild(toast);
+
+        setTimeout(() => {
+          toast.classList.add("is-hiding");
+          toast.addEventListener("animationend", () => toast.remove(), { once: true });
+        }, 2500);
+      });
+    }
   </script>
 
   {% block scripts %}{% endblock %}
