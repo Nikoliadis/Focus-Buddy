@@ -6,20 +6,19 @@
   <h1>Login</h1>
 
   <form method="post" action="{{ url_for('auth.login_post') }}">
-  <input type="hidden" name="next" value="{{ next }}">
+    <input type="hidden" name="next" value="{{ next or '' }}">
 
-  <label for="login">Username or Email</label>
-  <input id="login" name="login" autocomplete="username" required>
+    <label for="identifier">Username or Email</label>
+    <input id="identifier" name="identifier" autocomplete="username" required>
 
-  <label for="password">Password</label>
-  <input id="password" name="password" type="password" autocomplete="current-password" required>
+    <label for="password">Password</label>
+    <input id="password" name="password" type="password" autocomplete="current-password" required>
 
-  <button class="btn primary" type="submit">Sign in</button>
-</form>
+    <button class="btn primary" type="submit">Sign in</button>
+  </form>
 
-  <p class="muted">
-    Don’t have an account?
-    <a href="{{ url_for('auth.register_page') }}">Register</a>
+  <p class="muted" style="margin-top:1rem;">
+    Don’t have an account? <a href="{{ url_for('auth.register_page') }}">Register</a>
   </p>
 </section>
 {% endblock %}

@@ -1,42 +1,39 @@
 from __future__ import annotations
 
-from typing import Optional
 from werkzeug.security import generate_password_hash, check_password_hash
-
-from sqlalchemy import or_
 
 from main.db import db
 from models.user import User
 
 
-def _norm(s: str) -> str:
-    return (s or "").strip().lower()
+def find_user_by_username(username: str):
+    return User.query.filter_by(username=username).first()
 
 
-def find_user_by_login(login: str) -> Optional[User]:
-    """Login can be username OR email."""
-    value = _norm(login)
-    if not value:
+def find_user_by_email(email: str):
+    return User.query.filter_by(email=email).first()
+
+
+def find_user_by_login_identifier(identifier: str):
+    """Identifier can be username OR email."""
+    ident = (identifier or "").strip()
+    if not ident:
         return None
 
-    return User.query.filter(
-        or_(User.username == value, User.email == value)
-    ).first()
+    # if looks like email, try email first
+    if "@" in ident:
+        user = User.query.filter(db.func.lower(User.email) == ident.lower()).first()
+        if user:
+            return user
 
-
-def user_exists(username: str, email: str) -> bool:
-    u = _norm(username)
-    e = _norm(email)
-    return User.query.filter(or_(User.username == u, User.email == e)).first() is not None
+    # fallback username
+    return User.query.filter(db.func.lower(User.username) == ident.lower()).first()
 
 
 def create_user(username: str, email: str, password: str) -> User:
-    u = _norm(username)
-    e = _norm(email)
-
     user = User(
-        username=u,
-        email=e,
+        username=username.strip(),
+        email=email.strip().lower(),
         password_hash=generate_password_hash(password),
     )
     db.session.add(user)

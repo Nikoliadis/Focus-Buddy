@@ -3,41 +3,40 @@ from __future__ import annotations
 from flask import render_template, request, redirect, url_for, flash, session
 
 from . import auth_bp
-from .service import find_user_by_login, create_user, verify_password, user_exists
-from urllib.parse import urlparse, urljoin
+from .service import (
+    find_user_by_login_identifier,
+    find_user_by_username,
+    find_user_by_email,
+    create_user,
+    verify_password,
+)
 
-def _is_safe_url(target: str) -> bool:
-    if not target:
-        return False
-    ref_url = urlparse(request.host_url)
-    test_url = urlparse(urljoin(request.host_url, target))
-    return test_url.scheme in ("http", "https") and ref_url.netloc == test_url.netloc
 
 @auth_bp.get("/login")
 def login_page():
     if session.get("user_id"):
         return redirect(url_for("main.home"))
-    next_url = request.args.get("next", "")
+    next_url = request.args.get("next") or ""
     return render_template("auth/login.html", next=next_url)
 
 
 @auth_bp.post("/login")
 def login_post():
-    login = (request.form.get("login") or "").strip()
+    identifier = (request.form.get("identifier") or "").strip()
     password = request.form.get("password") or ""
-    next_url = request.form.get("next") or ""
+    next_url = (request.form.get("next") or "").strip()
 
-    user = find_user_by_login(login)
+    user = find_user_by_login_identifier(identifier)
     if not user or not verify_password(user, password):
-        flash("Invalid username/email or password.", "error")
-        return redirect(url_for("auth.login_page"))
+        flash("Invalid credentials.", "error")
+        return redirect(url_for("auth.login_page", next=next_url))
 
     session.permanent = True
     session["user_id"] = user.id
     session["username"] = user.username
-    flash("Logged in successfully ✅", "success")
 
-    if _is_safe_url(next_url):
+    flash("Logged in successfully ✅", "success")
+    if next_url:
         return redirect(next_url)
     return redirect(url_for("main.home"))
 
@@ -52,17 +51,16 @@ def register_page():
 @auth_bp.post("/register")
 def register_post():
     username = (request.form.get("username") or "").strip()
-    email = (request.form.get("email") or "").strip()
+    email = (request.form.get("email") or "").strip().lower()
     password = request.form.get("password") or ""
     confirm = request.form.get("confirm") or ""
 
-    # minimal validation (fast + safe)
     if len(username) < 3:
         flash("Username must be at least 3 characters.", "error")
         return redirect(url_for("auth.register_page"))
 
     if "@" not in email or "." not in email:
-        flash("Please enter a valid email address.", "error")
+        flash("Please enter a valid email.", "error")
         return redirect(url_for("auth.register_page"))
 
     if len(password) < 6:
@@ -73,19 +71,26 @@ def register_post():
         flash("Passwords do not match.", "error")
         return redirect(url_for("auth.register_page"))
 
-    if user_exists(username, email):
-        flash("Username or email already exists.", "error")
+    if find_user_by_username(username):
+        flash("Username already exists.", "error")
+        return redirect(url_for("auth.register_page"))
+
+    if find_user_by_email(email):
+        flash("Email already exists.", "error")
         return redirect(url_for("auth.register_page"))
 
     user = create_user(username, email, password)
+
+    session.permanent = True
     session["user_id"] = user.id
     session["username"] = user.username
+
     flash("Account created ✅", "success")
     return redirect(url_for("main.home"))
 
 
 @auth_bp.get("/logout")
 def logout():
-    session.pop("user_id", None)
-    session.pop("username", None)
+    session.clear()
+    flash("Logged out.", "info")
     return redirect(url_for("main.home"))
