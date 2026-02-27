@@ -35,6 +35,7 @@ def rooms_create_post():
         return redirect(url_for("rooms.rooms_create_page"))
 
     room = create_room(owner_id=session["user_id"], name=name, with_code=with_code)
+
     flash("Room created ✅", "success")
     return redirect(url_for("rooms.room_detail", room_id=room.id))
 
@@ -49,12 +50,29 @@ def rooms_join_page():
 @login_required
 def rooms_join_post():
     code = (request.form.get("code") or "").strip().upper()
+
+    if not code:
+        flash("Please enter a room code.", "error")
+        return redirect(url_for("rooms.rooms_join_page"))
+
     room = find_room_by_code(code)
     if not room:
         flash("Invalid room code.", "error")
         return redirect(url_for("rooms.rooms_join_page"))
 
+    # add member
     add_member(room, session["user_id"])
+
+    # verify membership (important!)
+    is_member = RoomMember.query.filter_by(
+        room_id=room.id,
+        user_id=session["user_id"]
+    ).first()
+
+    if not is_member:
+        flash("Could not join the room. Please try again.", "error")
+        return redirect(url_for("rooms.rooms_join_page"))
+
     flash("Joined room ✅", "success")
     return redirect(url_for("rooms.room_detail", room_id=room.id))
 
@@ -63,12 +81,17 @@ def rooms_join_post():
 @login_required
 def room_detail(room_id: int):
     room = get_room(room_id)
+
     if not room:
         flash("Room not found.", "error")
         return redirect(url_for("rooms.rooms_index"))
 
-    # authorization: must be a member
-    is_member = RoomMember.query.filter_by(room_id=room.id, user_id=session["user_id"]).first()
+    # must be a member
+    is_member = RoomMember.query.filter_by(
+        room_id=room.id,
+        user_id=session["user_id"]
+    ).first()
+
     if not is_member:
         flash("You are not a member of this room.", "error")
         return redirect(url_for("rooms.rooms_index"))
@@ -79,6 +102,11 @@ def room_detail(room_id: int):
         .order_by(RoomMember.joined_at.asc())
         .all()
     )
+
     member_count = len(members)
 
-    return render_template("rooms/room.html", room=room, member_count=member_count)
+    return render_template(
+        "rooms/room.html",
+        room=room,
+        member_count=member_count
+    )

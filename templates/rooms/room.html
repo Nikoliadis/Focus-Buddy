@@ -1,13 +1,29 @@
 {% extends "base.html" %}
-{% block title %}Join Room | FocusBuddy{% endblock %}
+{% block title %}{{ room.name }} | FocusBuddy{% endblock %}
 
 {% block content %}
 <section class="auth-card">
-  <h1>Join Room</h1>
-  <form method="post" action="{{ url_for('rooms.rooms_join_post') }}">
-    <label for="code">Room code</label>
-    <input id="code" name="code" required>
-    <button class="btn primary" type="submit">Join</button>
-  </form>
+  <h1>{{ room.name }}</h1>
+
+  <p class="muted">
+    Room ID: <strong>#{{ room.id }}</strong> · Members: <strong>{{ member_count }}</strong>
+  </p>
+
+  {% if room.join_code %}
+    <div class="card" style="margin-top: 1rem;">
+      <h3 style="margin:0 0 .5rem;">Join Code</h3>
+      <p style="margin:0; font-size:1.1rem; letter-spacing:.08em;">
+        <strong>{{ room.join_code }}</strong>
+      </p>
+      <p class="muted" style="margin:.5rem 0 0;">
+        Share this code with friends so they can join your room.
+      </p>
+    </div>
+  {% endif %}
+
+  <div class="actions" style="margin-top: 1.25rem;">
+    <a class="btn secondary" href="{{ url_for('rooms.rooms_index') }}">Back to Rooms</a>
+    <a class="btn primary" href="#" aria-disabled="true">Start Focus Session (soon)</a>
+  </div>
 </section>
 {% endblock %}
