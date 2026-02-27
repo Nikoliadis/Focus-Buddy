@@ -8,12 +8,14 @@ from config import Config
 from main.db import db
 from main import main_bp
 from models.user import User 
+from rooms import rooms_bp
 
 
 
 def create_app() -> Flask:
     app = Flask(__name__)
     app.config.from_object(Config)
+    app.register_blueprint(rooms_bp)
 
     db.init_app(app)
 

@@ -1,0 +1,32 @@
+{% extends "base.html" %}
+{% block title %}Rooms | FocusBuddy{% endblock %}
+
+{% block content %}
+<section class="hero">
+  <h1>Your Rooms</h1>
+  <div class="actions">
+    <a class="btn primary" href="{{ url_for('rooms.rooms_create_page') }}">Create Room</a>
+    <a class="btn secondary" href="{{ url_for('rooms.rooms_join_page') }}">Join with Code</a>
+  </div>
+</section>
+
+<section class="features">
+  {% if rooms %}
+    <div class="grid">
+      {% for room in rooms %}
+        <div class="card">
+          <h3>{{ room.name }}</h3>
+          {% if room.join_code %}
+            <p class="muted">Code: <strong>{{ room.join_code }}</strong></p>
+          {% else %}
+            <p class="muted">No join code</p>
+          {% endif %}
+          <a class="btn secondary" href="{{ url_for('rooms.room_detail', room_id=room.id) }}">Open</a>
+        </div>
+      {% endfor %}
+    </div>
+  {% else %}
+    <p class="muted">You haven’t joined any rooms yet.</p>
+  {% endif %}
+</section>
+{% endblock %}

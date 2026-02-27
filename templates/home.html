@@ -12,7 +12,10 @@
     </p>
 
     <div class="actions">
-      <a class="btn primary" href="#">Get Started</a>
+      <a class="btn primary"
+         href="{% if session.get('user_id') %}{{ url_for('rooms.rooms_index') }}{% else %}{{ url_for('auth.register_page') }}{% endif %}">
+        Get Started
+      </a>
       <a class="btn secondary" href="#features">Learn More</a>
     </div>
   </div>

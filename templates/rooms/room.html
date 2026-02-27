@@ -1,0 +1,13 @@
+{% extends "base.html" %}
+{% block title %}Join Room | FocusBuddy{% endblock %}
+
+{% block content %}
+<section class="auth-card">
+  <h1>Join Room</h1>
+  <form method="post" action="{{ url_for('rooms.rooms_join_post') }}">
+    <label for="code">Room code</label>
+    <input id="code" name="code" required>
+    <button class="btn primary" type="submit">Join</button>
+  </form>
+</section>
+{% endblock %}
