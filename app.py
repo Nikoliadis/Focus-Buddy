@@ -9,6 +9,7 @@ from main.db import db
 from main import main_bp
 from models.user import User 
 from rooms import rooms_bp
+from models.focus import FocusSession, FocusLog  # noqa: F401
 
 
 

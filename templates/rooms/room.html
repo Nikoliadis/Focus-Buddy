@@ -11,7 +11,7 @@
   </h1>
 
   <p class="muted">
-    Room ID: <strong>#{{ room.id }}</strong> · Members: <strong>{{ member_count }}</strong>
+    Room ID: <strong>#{{ room.id }}</strong> · Members: <strong><span id="members-count">{{ member_count }}</span></strong>
   </p>
 
   {% if room.join_code %}
@@ -50,7 +50,7 @@
   <div class="card" style="margin-top: 1rem;">
     <h3 style="margin:0 0 .75rem;">Members</h3>
 
-    <ul style="list-style:none; padding:0; margin:0; display:grid; gap:.45rem;">
+    <ul id="members-list" style="list-style:none; padding:0; margin:0; display:grid; gap:.45rem;">
       {% for user, is_room_owner in members %}
         <li style="display:flex; align-items:center; justify-content:space-between;">
           <span>
@@ -62,6 +62,39 @@
         </li>
       {% endfor %}
     </ul>
+  </div>
+
+  <div class="card" style="margin-top:1rem;">
+    <h3 style="margin-top:0;">Focus Session</h3>
+
+    <p class="muted" style="margin:.25rem 0 0;">
+      Status: <strong id="fs-status">idle</strong>
+    </p>
+
+    <div style="display:flex; gap:.75rem; align-items:center; margin-top:.75rem; flex-wrap:wrap;">
+      <div style="font-size:2rem; font-weight:800;" id="fs-timer">25:00</div>
+
+      <form method="post" action="{{ url_for('rooms.room_session_start', room_id=room.id) }}" style="margin:0; display:flex; gap:.5rem; align-items:center;">
+        <input name="minutes" type="number" min="1" max="180" value="25" style="width:90px;">
+        <button class="btn primary" type="submit">Start</button>
+      </form>
+
+      <form method="post" action="{{ url_for('rooms.room_session_pause', room_id=room.id) }}" style="margin:0;">
+        <button class="btn secondary" type="submit">Pause</button>
+      </form>
+
+      <form method="post" action="{{ url_for('rooms.room_session_resume', room_id=room.id) }}" style="margin:0;">
+        <button class="btn secondary" type="submit">Resume</button>
+      </form>
+
+      <form method="post" action="{{ url_for('rooms.room_session_reset', room_id=room.id) }}" style="margin:0;">
+        <button class="btn secondary" type="submit">Reset</button>
+      </form>
+
+      <form method="post" action="{{ url_for('rooms.room_session_end', room_id=room.id) }}" style="margin:0;">
+        <button class="btn danger minimal" type="submit">End</button>
+      </form>
+    </div>
   </div>
 
   <div class="actions" style="margin-top: 1.25rem; flex-wrap: wrap;">
@@ -86,7 +119,58 @@
       </form>
     {% endif %}
 
-    <a class="btn primary" href="#" aria-disabled="true">Start Focus Session (soon)</a>
   </div>
 </section>
+
+<script>
+  function fmt(seconds) {
+    const m = String(Math.floor(seconds / 60)).padStart(2, "0");
+    const s = String(seconds % 60).padStart(2, "0");
+    return `${m}:${s}`;
+  }
+
+  async function pollSession() {
+    try {
+      const res = await fetch("{{ url_for('rooms.room_session_status', room_id=room.id) }}", { cache: "no-store" });
+      if (!res.ok) return;
+      const data = await res.json();
+
+      document.getElementById("fs-status").textContent = data.status || "idle";
+      document.getElementById("fs-timer").textContent = fmt(data.remaining_seconds ?? 1500);
+    } catch (_) {}
+  }
+
+  async function pollPresence() {
+    try {
+      const res = await fetch("{{ url_for('rooms.room_presence', room_id=room.id) }}", { cache: "no-store" });
+      if (!res.ok) return;
+      const data = await res.json();
+
+      const countEl = document.getElementById("members-count");
+      if (countEl) countEl.textContent = data.count ?? 0;
+
+      const list = document.getElementById("members-list");
+      if (list && Array.isArray(data.members)) {
+        list.innerHTML = "";
+        data.members.forEach(m => {
+          const li = document.createElement("li");
+          li.style.display = "flex";
+          li.style.alignItems = "center";
+          li.style.justifyContent = "space-between";
+
+          const span = document.createElement("span");
+          span.textContent = (m.username || "").replace(/(^|\s)\S/g, t => t.toUpperCase());
+          li.appendChild(span);
+
+          list.appendChild(li);
+        });
+      }
+    } catch (_) {}
+  }
+
+  setInterval(pollSession, 1000);
+  setInterval(pollPresence, 5000);
+  pollSession();
+  pollPresence();
+</script>
 {% endblock %}

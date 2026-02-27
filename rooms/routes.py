@@ -1,8 +1,11 @@
 from __future__ import annotations
 
-from flask import render_template, request, redirect, url_for, flash, session
+from flask import render_template, request, redirect, url_for, flash, session, jsonify
 
 from main.auth_utils import login_required
+from main.db import db
+from models.user import User
+
 from . import rooms_bp
 from .models import RoomMember
 from .service import (
@@ -14,6 +17,15 @@ from .service import (
     get_room_members,
     remove_member,
     delete_room,
+)
+from .sessions_service import (
+    get_active_session,
+    get_latest_session,
+    start_session,
+    pause_session,
+    resume_session,
+    reset_session,
+    end_session,
 )
 
 
@@ -70,7 +82,6 @@ def rooms_join_post():
 
     add_member(room, session["user_id"])
 
-    # verify membership
     is_member = RoomMember.query.filter_by(room_id=room.id, user_id=session["user_id"]).first()
     if not is_member:
         flash("Could not join the room. Please try again.", "error")
@@ -90,7 +101,6 @@ def room_detail(room_id: int):
 
     user_id = session["user_id"]
 
-    # must be a member
     is_member = RoomMember.query.filter_by(room_id=room.id, user_id=user_id).first()
     if not is_member:
         flash("You are not a member of this room.", "error")
@@ -99,7 +109,6 @@ def room_detail(room_id: int):
     members = get_room_members(room)
     is_owner = (user_id == room.owner_id)
 
-    # invite link (prefill join page)
     invite_link = url_for(
         "rooms.rooms_join_page",
         code=room.join_code,
@@ -126,12 +135,10 @@ def room_leave(room_id: int):
 
     user_id = session["user_id"]
 
-    # owner cannot leave
     if user_id == room.owner_id:
         flash("Owner cannot leave the room. You can delete the room instead.", "error")
         return redirect(url_for("rooms.room_detail", room_id=room.id))
 
-    # must be member
     is_member = RoomMember.query.filter_by(room_id=room.id, user_id=user_id).first()
     if not is_member:
         flash("You are not a member of this room.", "error")
@@ -158,3 +165,119 @@ def room_delete(room_id: int):
     delete_room(room.id)
     flash("Room deleted ✅", "success")
     return redirect(url_for("rooms.rooms_index"))
+
+
+@rooms_bp.get("/rooms/<int:room_id>/session")
+@login_required
+def room_session_status(room_id: int):
+    room = get_room(room_id)
+    if not room:
+        return jsonify({"error": "Room not found"}), 404
+
+    is_member = RoomMember.query.filter_by(room_id=room_id, user_id=session["user_id"]).first()
+    if not is_member:
+        return jsonify({"error": "Forbidden"}), 403
+
+    s = get_active_session(room_id) or get_latest_session(room_id)
+
+    if not s:
+        return jsonify({
+            "status": "idle",
+            "duration_seconds": 25 * 60,
+            "remaining_seconds": 25 * 60,
+        })
+
+    return jsonify({
+        "status": s.status,
+        "duration_seconds": s.duration_seconds,
+        "remaining_seconds": s.remaining_seconds(),
+        "started_by": s.started_by,
+    })
+
+
+@rooms_bp.post("/rooms/<int:room_id>/session/start")
+@login_required
+def room_session_start(room_id: int):
+    room = get_room(room_id)
+    if not room:
+        flash("Room not found.", "error")
+        return redirect(url_for("rooms.rooms_index"))
+
+    is_member = RoomMember.query.filter_by(room_id=room_id, user_id=session["user_id"]).first()
+    if not is_member:
+        flash("You are not a member of this room.", "error")
+        return redirect(url_for("rooms.rooms_index"))
+
+    try:
+        minutes = int(request.form.get("minutes") or "25")
+    except ValueError:
+        minutes = 25
+
+    minutes = max(1, min(minutes, 180))
+    start_session(room_id=room_id, user_id=session["user_id"], duration_seconds=minutes * 60)
+
+    flash("Focus session started ✅", "success")
+    return redirect(url_for("rooms.room_detail", room_id=room_id))
+
+
+@rooms_bp.post("/rooms/<int:room_id>/session/pause")
+@login_required
+def room_session_pause(room_id: int):
+    s = get_active_session(room_id)
+    if s:
+        pause_session(s)
+        flash("Paused ⏸️", "info")
+    return redirect(url_for("rooms.room_detail", room_id=room_id))
+
+
+@rooms_bp.post("/rooms/<int:room_id>/session/resume")
+@login_required
+def room_session_resume(room_id: int):
+    s = get_active_session(room_id)
+    if s:
+        resume_session(s)
+        flash("Resumed ▶️", "success")
+    return redirect(url_for("rooms.room_detail", room_id=room_id))
+
+
+@rooms_bp.post("/rooms/<int:room_id>/session/reset")
+@login_required
+def room_session_reset(room_id: int):
+    s = get_active_session(room_id) or get_latest_session(room_id)
+    if s:
+        reset_session(s, session["user_id"])
+        flash("Reset 🔄", "info")
+    return redirect(url_for("rooms.room_detail", room_id=room_id))
+
+
+@rooms_bp.post("/rooms/<int:room_id>/session/end")
+@login_required
+def room_session_end(room_id: int):
+    s = get_active_session(room_id) or get_latest_session(room_id)
+    if s:
+        end_session(s, session["user_id"])
+        flash("Session ended ✅", "success")
+    return redirect(url_for("rooms.room_detail", room_id=room_id))
+
+
+@rooms_bp.get("/rooms/<int:room_id>/presence")
+@login_required
+def room_presence(room_id: int):
+    room = get_room(room_id)
+    if not room:
+        return jsonify({"error": "Room not found"}), 404
+
+    is_member = RoomMember.query.filter_by(room_id=room_id, user_id=session["user_id"]).first()
+    if not is_member:
+        return jsonify({"error": "Forbidden"}), 403
+
+    rows = (
+        db.session.query(User.username, RoomMember.user_id)
+        .join(RoomMember, RoomMember.user_id == User.id)
+        .filter(RoomMember.room_id == room_id)
+        .order_by(RoomMember.joined_at.asc())
+        .all()
+    )
+
+    members = [{"user_id": uid, "username": uname} for (uname, uid) in rows]
+    return jsonify({"count": len(members), "members": members})
