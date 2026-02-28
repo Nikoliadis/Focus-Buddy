@@ -16,5 +16,18 @@ services:
       timeout: 5s
       retries: 10
 
+  web:
+    build: .
+    container_name: focusbuddy_web
+    environment:
+      SECRET_KEY: "dev-secret"
+      COOKIE_SECURE: "0"
+      DATABASE_URL: "postgresql+psycopg://focusbuddy:focusbuddy_pass@focusbuddy_db:5432/focusbuddy"
+    ports:
+      - "5000:5000"
+    depends_on:
+      db:
+        condition: service_healthy
+
 volumes:
   pgdata:

@@ -178,4 +178,66 @@
   setInterval(pollSession, 1000);
   setInterval(pollPresence, 5000);
 </script>
+
+<script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
+<script>
+  const ROOM_ID = {{ room.id }};
+  const IS_OWNER = {{ 'true' if is_owner else 'false' }};
+
+  const socket = io();
+
+  function fmt(seconds) {
+    const m = String(Math.floor(seconds / 60)).padStart(2, "0");
+    const s = String(Math.floor(seconds % 60)).padStart(2, "0");
+    return `${m}:${s}`;
+  }
+
+  socket.on("connect", () => {
+    socket.emit("room:join", { room_id: ROOM_ID });
+  });
+
+  socket.on("timer:update", (data) => {
+    if (!data || data.room_id !== ROOM_ID) return;
+    const statusEl = document.getElementById("fs-status");
+    const timerEl = document.getElementById("fs-timer");
+    if (statusEl) statusEl.textContent = data.status || "idle";
+    if (timerEl) timerEl.textContent = fmt(data.remaining_seconds ?? 1500);
+  });
+
+  socket.on("presence:update", (data) => {
+    if (!data || data.room_id !== ROOM_ID) return;
+    const countEl = document.getElementById("members-count");
+    if (countEl) countEl.textContent = data.count ?? 0;
+  });
+
+  socket.on("error", (data) => {
+    console.log("socket error:", data);
+  });
+
+  document.addEventListener("DOMContentLoaded", () => {
+    const startForm = document.getElementById("fs-start-form");
+    const pauseBtn = document.getElementById("fs-pause");
+    const resumeBtn = document.getElementById("fs-resume");
+    const resetBtn = document.getElementById("fs-reset");
+    const endBtn = document.getElementById("fs-end");
+
+    if (startForm) {
+      startForm.addEventListener("submit", (e) => {
+        e.preventDefault();
+        if (!IS_OWNER) return;
+        const minutes = Number(startForm.querySelector("input[name='minutes']").value || 25);
+        socket.emit("timer:start", { room_id: ROOM_ID, minutes });
+      });
+    }
+
+    if (pauseBtn) pauseBtn.addEventListener("click", () => IS_OWNER && socket.emit("timer:pause", { room_id: ROOM_ID }));
+    if (resumeBtn) resumeBtn.addEventListener("click", () => IS_OWNER && socket.emit("timer:resume", { room_id: ROOM_ID }));
+    if (resetBtn) resetBtn.addEventListener("click", () => IS_OWNER && socket.emit("timer:reset", { room_id: ROOM_ID }));
+    if (endBtn) endBtn.addEventListener("click", () => IS_OWNER && socket.emit("timer:end", { room_id: ROOM_ID }));
+  });
+
+  window.addEventListener("beforeunload", () => {
+    socket.emit("room:leave", { room_id: ROOM_ID });
+  });
+</script>
 {% endblock %}
