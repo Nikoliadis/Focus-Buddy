@@ -52,15 +52,15 @@
 
     <ul id="members-list" style="list-style:none; padding:0; margin:0; display:grid; gap:.45rem;">
       {% for user, is_room_owner in members %}
-        <li style="display:flex; align-items:center; justify-content:space-between;">
-          <span>
-            {{ user.username | title }}
-            {% if is_room_owner %}
-              <strong style="margin-left:.35rem;">👑</strong>
-            {% endif %}
-          </span>
-        </li>
-      {% endfor %}
+  <li style="display:flex; align-items:center; justify-content:space-between;">
+    <span>
+      {{ user.username | title }}
+      {% if user.id == room.owner_id %}
+        <strong style="margin-left:.35rem;">👑</strong>
+      {% endif %}
+    </span>
+  </li>
+{% endfor %}
     </ul>
   </div>
 
@@ -125,8 +125,27 @@
 <script>
   function fmt(seconds) {
     const m = String(Math.floor(seconds / 60)).padStart(2, "0");
-    const s = String(seconds % 60).padStart(2, "0");
+    const s = String(Math.floor(seconds % 60)).padStart(2, "0");
     return `${m}:${s}`;
+  }
+
+  async function copyInviteLink() {
+    const input = document.getElementById("inviteLink");
+    if (!input) return;
+    try {
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        await navigator.clipboard.writeText(input.value);
+      } else {
+        input.select();
+        document.execCommand('copy');
+      }
+      const btn = input.nextElementSibling;
+      if (btn && btn.tagName === 'BUTTON') {
+        const orig = btn.textContent;
+        btn.textContent = "Copied!";
+        setTimeout(() => btn.textContent = orig, 1500);
+      }
+    } catch (_) {}
   }
 
   async function pollSession() {
@@ -135,8 +154,11 @@
       if (!res.ok) return;
       const data = await res.json();
 
-      document.getElementById("fs-status").textContent = data.status || "idle";
-      document.getElementById("fs-timer").textContent = fmt(data.remaining_seconds ?? 1500);
+      const statusEl = document.getElementById("fs-status");
+      const timerEl = document.getElementById("fs-timer");
+
+      if (statusEl) statusEl.textContent = data.status || "idle";
+      if (timerEl) timerEl.textContent = fmt(data.remaining_seconds ?? 1500);
     } catch (_) {}
   }
 
@@ -148,29 +170,12 @@
 
       const countEl = document.getElementById("members-count");
       if (countEl) countEl.textContent = data.count ?? 0;
-
-      const list = document.getElementById("members-list");
-      if (list && Array.isArray(data.members)) {
-        list.innerHTML = "";
-        data.members.forEach(m => {
-          const li = document.createElement("li");
-          li.style.display = "flex";
-          li.style.alignItems = "center";
-          li.style.justifyContent = "space-between";
-
-          const span = document.createElement("span");
-          span.textContent = (m.username || "").replace(/(^|\s)\S/g, t => t.toUpperCase());
-          li.appendChild(span);
-
-          list.appendChild(li);
-        });
-      }
     } catch (_) {}
   }
 
-  setInterval(pollSession, 1000);
-  setInterval(pollPresence, 5000);
   pollSession();
   pollPresence();
+  setInterval(pollSession, 1000);
+  setInterval(pollPresence, 5000);
 </script>
 {% endblock %}
