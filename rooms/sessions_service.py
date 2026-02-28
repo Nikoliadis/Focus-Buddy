@@ -9,7 +9,10 @@ from models.focus import FocusSession, FocusLog
 def get_active_session(room_id: int) -> FocusSession | None:
     return (
         FocusSession.query
-        .filter(FocusSession.room_id == room_id, FocusSession.status.in_(["running", "paused"]))
+        .filter(
+            FocusSession.room_id == room_id,
+            FocusSession.status.in_(["running", "paused"])  # ΟΧΙ ended
+        )
         .order_by(FocusSession.created_at.desc())
         .first()
     )
@@ -25,7 +28,6 @@ def get_latest_session(room_id: int) -> FocusSession | None:
 
 
 def start_session(room_id: int, user_id: int, duration_seconds: int) -> FocusSession:
-    # end any active session (safety)
     active = get_active_session(room_id)
     if active:
         end_session(active, user_id)
@@ -38,6 +40,7 @@ def start_session(room_id: int, user_id: int, duration_seconds: int) -> FocusSes
         started_at=datetime.utcnow(),
         paused_seconds=0,
         paused_at=None,
+        ended_at=None,
     )
     db.session.add(s)
     db.session.commit()
@@ -47,6 +50,7 @@ def start_session(room_id: int, user_id: int, duration_seconds: int) -> FocusSes
 def pause_session(s: FocusSession) -> FocusSession:
     if s.status != "running":
         return s
+
     s.status = "paused"
     s.paused_at = datetime.utcnow()
     db.session.commit()
@@ -56,8 +60,10 @@ def pause_session(s: FocusSession) -> FocusSession:
 def resume_session(s: FocusSession) -> FocusSession:
     if s.status != "paused":
         return s
+
     if s.paused_at:
         s.paused_seconds += int((datetime.utcnow() - s.paused_at).total_seconds())
+
     s.paused_at = None
     s.status = "running"
     db.session.commit()
@@ -84,6 +90,13 @@ def end_session(s: FocusSession, user_id: int) -> FocusSession:
 
     s.status = "ended"
     s.ended_at = datetime.utcnow()
+
+    # 🔴 ΚΡΙΣΙΜΟ FIX:
+    # Αν ήταν paused, αφαιρούμε paused time
+    if s.paused_at:
+        s.paused_seconds += int((datetime.utcnow() - s.paused_at).total_seconds())
+        s.paused_at = None
+
     db.session.commit()
 
     log = FocusLog(
@@ -94,4 +107,5 @@ def end_session(s: FocusSession, user_id: int) -> FocusSession:
     )
     db.session.add(log)
     db.session.commit()
+
     return s
