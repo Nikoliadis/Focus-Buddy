@@ -1,0 +1,127 @@
+{% extends "base.html" %}
+{% block title %}My Stats | FocusBuddy{% endblock %}
+
+{% block head %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+{% endblock %}
+
+{% block content %}
+<section class="hero" style="padding-bottom:1rem;">
+  <h1>My Stats</h1>
+  <p class="muted">Your focus history at a glance.</p>
+</section>
+
+<!-- Summary cards -->
+<div class="grid" style="margin-bottom:1.5rem;">
+  <div class="card" style="text-align:center;">
+    <div style="font-size:2rem; font-weight:800; color:#60a5fa;">{{ today_fmt }}</div>
+    <div class="muted" style="margin-top:.35rem;">Today</div>
+  </div>
+
+  <div class="card" style="text-align:center;">
+    <div style="font-size:2rem; font-weight:800; color:#4ade80;">{{ week_fmt }}</div>
+    <div class="muted" style="margin-top:.35rem;">Last 7 Days</div>
+  </div>
+
+  <div class="card" style="text-align:center;">
+    <div style="font-size:2rem; font-weight:800; color:#f472b6;">{{ total_fmt }}</div>
+    <div class="muted" style="margin-top:.35rem;">All Time</div>
+  </div>
+</div>
+
+<!-- Second row -->
+<div class="grid" style="grid-template-columns: 2fr 1fr; margin-bottom:1.5rem;">
+
+  <!-- Bar chart -->
+  <div class="card">
+    <h3 style="margin-top:0; margin-bottom:1rem;">Focus per day (last 7 days)</h3>
+    <canvas id="focusChart" height="120"></canvas>
+  </div>
+
+  <!-- Sessions count -->
+  <div class="card" style="display:flex; flex-direction:column; align-items:center; justify-content:center; text-align:center;">
+    <div style="font-size:3rem; font-weight:800; color:#fb923c;">{{ session_count }}</div>
+    <div class="muted" style="margin-top:.35rem;">Sessions<br>Completed</div>
+  </div>
+</div>
+
+<!-- Per-room breakdown -->
+{% if per_room %}
+<div class="card" style="margin-bottom:2rem;">
+  <h3 style="margin-top:0;">Focus by Room</h3>
+  <table style="width:100%; border-collapse:collapse;">
+    <thead>
+      <tr style="opacity:.6; font-size:.9rem; text-align:left;">
+        <th style="padding:.5rem 0;">Room</th>
+        <th style="padding:.5rem 0; text-align:right;">Time</th>
+        <th style="padding:.5rem 0; text-align:right; width:40%;">Progress</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% set max_secs = per_room[0][1] %}
+      {% for name, secs, fmt in per_room %}
+      <tr style="border-top:1px solid rgba(226,232,240,.08);">
+        <td style="padding:.6rem 0;">{{ name }}</td>
+        <td style="padding:.6rem 0; text-align:right; opacity:.8;">{{ fmt }}</td>
+        <td style="padding:.6rem 0 .6rem 1rem;">
+          <div style="background:rgba(226,232,240,.08); border-radius:99px; height:6px; overflow:hidden;">
+            <div style="background:#60a5fa; height:100%; border-radius:99px; width:{{ (secs / max_secs * 100) | int }}%;"></div>
+          </div>
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% else %}
+<div class="card" style="text-align:center; margin-bottom:2rem;">
+  <p class="muted">No sessions yet. Join a room and start focusing!</p>
+  <a class="btn primary" href="{{ url_for('rooms.rooms_index') }}">Go to Rooms</a>
+</div>
+{% endif %}
+
+<script>
+  const ctx = document.getElementById("focusChart");
+  if (ctx) {
+    new Chart(ctx, {
+      type: "bar",
+      data: {
+        labels: {{ chart_labels | tojson }},
+        datasets: [{
+          label: "Minutes",
+          data: {{ chart_values | tojson }},
+          backgroundColor: "rgba(96, 165, 250, 0.5)",
+          borderColor: "rgba(96, 165, 250, 0.9)",
+          borderWidth: 1,
+          borderRadius: 6,
+        }]
+      },
+      options: {
+        responsive: true,
+        plugins: {
+          legend: { display: false },
+          tooltip: {
+            callbacks: {
+              label: (ctx) => ` ${ctx.parsed.y} min`
+            }
+          }
+        },
+        scales: {
+          x: {
+            grid: { color: "rgba(226,232,240,.06)" },
+            ticks: { color: "rgba(226,232,240,.6)" }
+          },
+          y: {
+            beginAtZero: true,
+            grid: { color: "rgba(226,232,240,.06)" },
+            ticks: {
+              color: "rgba(226,232,240,.6)",
+              callback: (v) => `${v}m`
+            }
+          }
+        }
+      }
+    });
+  }
+</script>
+{% endblock %}

@@ -3,40 +3,79 @@
 {% block title %}Home | FocusBuddy{% endblock %}
 
 {% block content %}
-<section class="hero">
-  <div class="container">
-    <h1>Study Better. Together.</h1>
-    <p>
-      Real-time focus rooms, a synchronized Pomodoro timer, and productivity insights—
-      built for students and study groups.
-    </p>
+<section class="hero" style="padding: 6rem 0 4rem; text-align:center;">
+  <h1 style="font-size: clamp(2.4rem, 5vw, 3.8rem); margin-bottom: 1rem;">Study Better. Together.</h1>
+  <p style="font-size:1.15rem; max-width:52ch; margin: 0 auto 2rem; opacity:.85;">
+    Real-time focus rooms, a synchronized Pomodoro timer, and productivity insights —
+    built for students and study groups.
+  </p>
+  <div class="actions" style="justify-content:center;">
+    <a class="btn primary"
+       href="{% if session.get('user_id') %}{{ url_for('rooms.rooms_index') }}{% else %}{{ url_for('auth.register_page') }}{% endif %}">
+      Get Started
+    </a>
+    <a class="btn secondary" href="#features">Learn More</a>
+  </div>
+</section>
 
-    <div class="actions">
-      <a class="btn primary"
-         href="{% if session.get('user_id') %}{{ url_for('rooms.rooms_index') }}{% else %}{{ url_for('auth.register_page') }}{% endif %}">
-        Get Started
-      </a>
-      <a class="btn secondary" href="#features">Learn More</a>
+<!-- Features -->
+<section id="features" class="features" style="padding: 4rem 0;">
+  <div class="container">
+    <h2 style="text-align:center; margin-bottom:2rem; opacity:.9;">Everything you need to stay focused</h2>
+    <div class="grid">
+      <article class="card">
+        <div style="font-size:1.8rem; margin-bottom:.6rem;">🏠</div>
+        <h3 style="margin-top:0;">Real-Time Focus Rooms</h3>
+        <p class="muted" style="margin-top:.5rem;">Create or join rooms and focus together with live presence indicators.</p>
+      </article>
+
+      <article class="card">
+        <div style="font-size:1.8rem; margin-bottom:.6rem;">⏱️</div>
+        <h3 style="margin-top:0;">Synchronized Pomodoro</h3>
+        <p class="muted" style="margin-top:.5rem;">Everyone sees the same timer — start, pause, and reset as a group.</p>
+      </article>
+
+      <article class="card">
+        <div style="font-size:1.8rem; margin-bottom:.6rem;">📊</div>
+        <h3 style="margin-top:0;">Productivity Insights</h3>
+        <p class="muted" style="margin-top:.5rem;">Track focus time and completed sessions at individual and group level.</p>
+      </article>
     </div>
   </div>
 </section>
 
-<section id="features" class="features">
-  <div class="container grid">
-    <article class="card">
-      <h3>Real-Time Focus Rooms</h3>
-      <p>Create or join rooms and focus together with live presence.</p>
-    </article>
-
-    <article class="card">
-      <h3>Synchronized Pomodoro</h3>
-      <p>Everyone sees the same timer—start, pause, and reset as a group.</p>
-    </article>
-
-    <article class="card">
-      <h3>Productivity Insights</h3>
-      <p>Track focus time and completed sessions at individual and group level.</p>
-    </article>
+<!-- How it works -->
+<section style="padding: 4rem 0; border-top: 1px solid rgba(226,232,240,.1);">
+  <div class="container">
+    <h2 style="text-align:center; margin-bottom:2.5rem; opacity:.9;">How it works</h2>
+    <div class="grid">
+      <div style="text-align:center; padding: 1rem;">
+        <div style="font-size:2.5rem; font-weight:800; color:#60a5fa; margin-bottom:.5rem;">1</div>
+        <h4 style="margin:0 0 .5rem;">Create a Room</h4>
+        <p class="muted" style="margin:0;">Set up your study room in seconds and get a shareable invite link.</p>
+      </div>
+      <div style="text-align:center; padding: 1rem;">
+        <div style="font-size:2.5rem; font-weight:800; color:#4ade80; margin-bottom:.5rem;">2</div>
+        <h4 style="margin:0 0 .5rem;">Invite Your Group</h4>
+        <p class="muted" style="margin:0;">Share the room code with friends or classmates and study together.</p>
+      </div>
+      <div style="text-align:center; padding: 1rem;">
+        <div style="font-size:2.5rem; font-weight:800; color:#f472b6; margin-bottom:.5rem;">3</div>
+        <h4 style="margin:0 0 .5rem;">Start Focusing</h4>
+        <p class="muted" style="margin:0;">Launch a Pomodoro timer and track your progress in real time.</p>
+      </div>
+    </div>
   </div>
 </section>
+
+<!-- CTA -->
+<section style="padding: 4rem 0 5rem; text-align:center; border-top: 1px solid rgba(226,232,240,.1);">
+  <h2 style="margin-bottom:.75rem;">Ready to focus?</h2>
+  <p class="muted" style="margin-bottom:1.5rem;">Join FocusBuddy and start your first session today.</p>
+  <a class="btn primary"
+     href="{% if session.get('user_id') %}{{ url_for('rooms.rooms_index') }}{% else %}{{ url_for('auth.register_page') }}{% endif %}">
+    {% if session.get('user_id') %}Go to Rooms{% else %}Create Free Account{% endif %}
+  </a>
+</section>
+
 {% endblock %}

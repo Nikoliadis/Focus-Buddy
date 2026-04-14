@@ -34,6 +34,12 @@
               Rooms
             </a>
           </li>
+          <li>
+            <a href="{{ url_for('main.stats') }}"
+               class="{% if request.endpoint == 'main.stats' %}active{% endif %}">
+              Stats
+            </a>
+          </li>
           <li class="nav-hello">Hi, {{ session.username | title }}</li>
           <li><a href="{{ url_for('auth.logout') }}">Logout</a></li>
         {% else %}
