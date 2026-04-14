@@ -12,12 +12,14 @@ from .presence_store import PRESENCE, LAST_SEEN, ROOM_CYCLES
 from .service import (
     create_room,
     get_user_rooms,
+    get_public_rooms,
     get_room,
     add_member,
     find_room_by_code,
     get_room_members,
     remove_member,
     delete_room,
+    verify_room_password,
 )
 from .sessions_service import (
     get_active_session,
@@ -34,8 +36,27 @@ from .sessions_service import (
 @login_required
 def rooms_index():
     user_id = session["user_id"]
-    rooms = get_user_rooms(user_id)
-    return render_template("rooms/index.html", rooms=rooms)
+    my_rooms = get_user_rooms(user_id)
+    my_room_ids = {r["room"].id for r in my_rooms}
+    public_rooms = [r for r in get_public_rooms() if r["room"].id not in my_room_ids]
+    return render_template("rooms/index.html", my_rooms=my_rooms, public_rooms=public_rooms)
+
+
+@rooms_bp.post("/rooms/<int:room_id>/join-public")
+@login_required
+def room_join_public(room_id: int):
+    room = get_room(room_id)
+    if not room:
+        flash("Room not found.", "error")
+        return redirect(url_for("rooms.rooms_index"))
+
+    if room.is_private:
+        flash("This room is private. Use the join code and password.", "error")
+        return redirect(url_for("rooms.rooms_join_page", code=room.join_code or ""))
+
+    add_member(room, session["user_id"])
+    flash("Joined room ✅", "success")
+    return redirect(url_for("rooms.room_detail", room_id=room.id))
 
 
 @rooms_bp.get("/rooms/create")
@@ -49,12 +70,22 @@ def rooms_create_page():
 def rooms_create_post():
     name = (request.form.get("name") or "").strip()
     with_code = (request.form.get("with_code") == "on")
+    password = (request.form.get("password") or "").strip()
 
     if len(name) < 3 or len(name) > 50:
         flash("Room name must be between 3 and 50 characters.", "error")
         return redirect(url_for("rooms.rooms_create_page"))
 
-    room = create_room(owner_id=session["user_id"], name=name, with_code=with_code)
+    if password and len(password) > 128:
+        flash("Password must be 128 characters or fewer.", "error")
+        return redirect(url_for("rooms.rooms_create_page"))
+
+    room = create_room(
+        owner_id=session["user_id"],
+        name=name,
+        with_code=with_code,
+        password=password or None,
+    )
 
     flash("Room created ✅", "success")
     return redirect(url_for("rooms.room_detail", room_id=room.id))
@@ -71,6 +102,7 @@ def rooms_join_page():
 @login_required
 def rooms_join_post():
     code = (request.form.get("code") or "").strip().upper()
+    password = (request.form.get("password") or "").strip()
 
     if not code:
         flash("Please enter a room code.", "error")
@@ -80,6 +112,10 @@ def rooms_join_post():
     if not room:
         flash("Invalid room code.", "error")
         return redirect(url_for("rooms.rooms_join_page"))
+
+    if not verify_room_password(room, password):
+        flash("Incorrect room password.", "error")
+        return redirect(url_for("rooms.rooms_join_page", code=code))
 
     add_member(room, session["user_id"])
 
@@ -286,6 +322,31 @@ def room_session_end(room_id: int):
         end_session(s, session["user_id"])
         flash("Session ended ✅", "success")
     return redirect(url_for("rooms.room_detail", room_id=room_id))
+
+
+@rooms_bp.post("/rooms/<int:room_id>/kick/<int:target_id>")
+@login_required
+def room_kick(room_id: int, target_id: int):
+    room = get_room(room_id)
+    if not room:
+        return jsonify({"error": "Room not found"}), 404
+
+    if session["user_id"] != room.owner_id:
+        return jsonify({"error": "Only the owner can kick members"}), 403
+
+    if target_id == room.owner_id:
+        return jsonify({"error": "Cannot kick the owner"}), 400
+
+    is_member = RoomMember.query.filter_by(room_id=room_id, user_id=target_id).first()
+    if not is_member:
+        return jsonify({"error": "User is not a member"}), 404
+
+    remove_member(room_id, target_id)
+
+    from main.socketio_ext import socketio
+    socketio.emit("user:kicked", {"room_id": room_id, "user_id": target_id}, room=f"room:{room_id}")
+
+    return jsonify({"ok": True})
 
 
 @rooms_bp.get("/rooms/<int:room_id>/presence")

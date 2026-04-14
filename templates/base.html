@@ -40,6 +40,12 @@
               Stats
             </a>
           </li>
+          <li>
+            <a href="{{ url_for('main.leaderboard') }}"
+               class="{% if request.endpoint == 'main.leaderboard' %}active{% endif %}">
+              🏆
+            </a>
+          </li>
           <li class="nav-hello">Hi, {{ session.username | title }}</li>
           <li><a href="{{ url_for('auth.logout') }}">Logout</a></li>
         {% else %}

@@ -6,13 +6,25 @@
   <h1>Create Room</h1>
   <form method="post" action="{{ url_for('rooms.rooms_create_post') }}">
     <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+
     <label for="name">Room name</label>
-    <input id="name" name="name" required>
+    <input id="name" name="name" required maxlength="50">
 
     <label style="display:flex; gap:.5rem; align-items:center;">
       <input type="checkbox" name="with_code" checked>
       Generate join code
     </label>
+
+    <label for="room-password" style="margin-top:.75rem;">
+      Room password <span class="muted" style="font-size:.85rem;">(optional — leave blank for public)</span>
+    </label>
+    <div class="password-wrap">
+      <input id="room-password" name="password" type="password"
+             placeholder="Leave blank for public room" maxlength="128"
+             autocomplete="new-password">
+      <button type="button" class="pw-toggle" onclick="togglePw('room-password', this)"
+              aria-label="Show password">👁</button>
+    </div>
 
     <button class="btn primary" type="submit">Create</button>
   </form>

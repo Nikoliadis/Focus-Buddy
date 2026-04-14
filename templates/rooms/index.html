@@ -17,19 +17,31 @@
 </section>
 
 <section class="features">
-  {% if rooms %}
+  {% if my_rooms %}
     <div class="grid">
-      {% for room in rooms %}
+      {% for item in my_rooms %}
+        {% set room = item.room %}
         <div class="card">
-          <h3 style="margin-top:0;">{{ room.name }}</h3>
+          <h3 style="margin-top:0;">
+            {{ room.name }}
+            {% if room.is_private %}
+              <span title="Private room" style="font-size:.9rem; opacity:.7;">🔒</span>
+            {% endif %}
+          </h3>
 
-          {% if room.join_code %}
-            <p class="muted">
-              Code: <strong>{{ room.join_code }}</strong>
-            </p>
-          {% else %}
-            <p class="muted">No join code</p>
-          {% endif %}
+          <p class="muted" style="margin:.25rem 0 .1rem;">
+            Owner: <strong>{{ item.owner | title }}</strong>
+            {% if room.owner_id == session.get('user_id') %}
+              <span style="opacity:.5; font-size:.85rem;">(you)</span>
+            {% endif %}
+          </p>
+
+          <p class="muted" style="margin:.1rem 0 .6rem; font-size:.9rem;">
+            {{ item.member_count }} member{{ 's' if item.member_count != 1 }}
+            {% if room.join_code %}
+              &nbsp;·&nbsp; Code: <strong>{{ room.join_code }}</strong>
+            {% endif %}
+          </p>
 
           <div class="actions room-actions">
             <a class="btn secondary"
@@ -43,18 +55,44 @@
                     onsubmit="return confirm('Delete this room? This cannot be undone.');"
                     style="margin:0;">
                 <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                <button type="submit" class="btn danger">
-                  Delete
-                </button>
+                <button type="submit" class="btn danger">Delete</button>
               </form>
             {% endif %}
           </div>
-
         </div>
       {% endfor %}
     </div>
   {% else %}
-    <p class="muted">You haven’t joined any rooms yet.</p>
+    <p class="muted">You haven't joined any rooms yet.</p>
   {% endif %}
 </section>
+
+{% if public_rooms %}
+<section style="margin-top:2rem;">
+  <h2 style="margin-bottom:1rem;">Public Rooms</h2>
+  <div class="grid">
+    {% for item in public_rooms %}
+      {% set room = item.room %}
+      <div class="card">
+        <h3 style="margin-top:0;">{{ room.name }}</h3>
+
+        <p class="muted" style="margin:.25rem 0 .1rem;">
+          Owner: <strong>{{ item.owner | title }}</strong>
+        </p>
+        <p class="muted" style="margin:.1rem 0 .6rem; font-size:.9rem;">
+          {{ item.member_count }} member{{ 's' if item.member_count != 1 }}
+        </p>
+
+        <form method="post"
+              action="{{ url_for('rooms.room_join_public', room_id=room.id) }}"
+              style="margin:0;">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+          <button type="submit" class="btn primary">Join</button>
+        </form>
+      </div>
+    {% endfor %}
+  </div>
+</section>
+{% endif %}
+
 {% endblock %}

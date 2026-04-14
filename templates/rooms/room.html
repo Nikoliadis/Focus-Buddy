@@ -5,6 +5,9 @@
 <section class="auth-card">
   <h1 style="margin-bottom:.25rem;">
     {{ room.name }}
+    {% if room.is_private %}
+      <span title="Private room" style="font-size:.85rem; opacity:.65;">🔒</span>
+    {% endif %}
     {% if is_owner %}
       <span class="muted" style="font-size:.95rem;">(Owner)</span>
     {% endif %}
@@ -47,6 +50,21 @@
   </div>
 {% endif %}
 
+{% if is_owner and room.is_private %}
+  <div class="card" style="margin-top: 1rem;">
+    <h3 style="margin:0 0 .5rem;">Room Password</h3>
+    <p class="muted" style="font-size:.85rem; margin:0 0 .6rem;">Only visible to you. Share this with people you want to invite.</p>
+    <div style="display:flex; gap:.5rem; align-items:center; flex-wrap:wrap;">
+      <input id="roomPasswordDisplay" type="password"
+             value="{{ room.room_password }}" readonly
+             style="flex:1; padding:.6rem; border-radius:.6rem; border:1px solid rgba(255,255,255,.15); background:rgba(255,255,255,.05); color:#fff; letter-spacing:.1em;">
+      <button type="button" class="btn secondary pw-toggle"
+              onclick="togglePw('roomPasswordDisplay', this)"
+              aria-label="Show password">👁</button>
+    </div>
+  </div>
+{% endif %}
+
   <div class="card" style="margin-top: 1rem;">
     <h3 style="margin:0 0 .75rem;">Members</h3>
 
@@ -61,6 +79,14 @@
           {% endif %}
           <span id="ls-{{ user.id }}" class="muted" style="font-size:.8rem; margin:0;"></span>
         </span>
+        {% if is_owner and user.id != room.owner_id %}
+          <button
+            class="btn danger"
+            style="padding:.25rem .6rem; font-size:.78rem;"
+            onclick="kickUser({{ user.id }}, '{{ user.username | title }}')">
+            Kick
+          </button>
+        {% endif %}
       </li>
       {% endfor %}
     </ul>
@@ -282,6 +308,22 @@
     }, 1000);
   }
 
+  async function kickUser(userId, username) {
+    if (!confirm(`Kick ${username} from the room?`)) return;
+    try {
+      const res = await fetch(`/rooms/${ROOM_ID}/kick/${userId}`, {
+        method: "POST",
+        headers: { "X-CSRF-Token": "{{ csrf_token() }}" },
+      });
+      if (!res.ok) {
+        const d = await res.json();
+        showToast(d.error || "Could not kick user.", "error");
+      }
+    } catch (_) {
+      showToast("Network error.", "error");
+    }
+  }
+
   function cancelCycle() {
     if (_cycleCountdown) { clearInterval(_cycleCountdown); _cycleCountdown = null; }
     const t = document.getElementById("cycle-toast");
@@ -348,6 +390,7 @@
 <script>
   const ROOM_ID = {{ room.id }};
   const IS_OWNER = {{ 'true' if is_owner else 'false' }};
+  const CURRENT_USER_ID = {{ session['user_id'] }};
 
   const socket = io();
 
@@ -363,6 +406,18 @@
   socket.on("presence:update", (data) => {
     if (!data || data.room_id !== ROOM_ID) return;
     applyPresence(data.online_ids, data.last_seen);
+  });
+
+  socket.on("user:kicked", (data) => {
+    if (!data || data.room_id !== ROOM_ID) return;
+    if (data.user_id === CURRENT_USER_ID) {
+      alert("You have been kicked from this room.");
+      window.location.href = "{{ url_for('rooms.rooms_index') }}";
+    } else {
+      // Remove the member row from the list
+      const el = document.querySelector(`[data-user-id="${data.user_id}"]`);
+      if (el) el.remove();
+    }
   });
 
   socket.on("error", (data) => {

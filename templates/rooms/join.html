@@ -7,8 +7,21 @@
 
   <form method="post" action="{{ url_for('rooms.rooms_join_post') }}">
     <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+
     <label for="code">Room code</label>
     <input id="code" name="code" required value="{{ prefill_code or '' }}" />
+
+    <label for="join-password" style="margin-top:.75rem;">
+      Password <span class="muted" style="font-size:.85rem;">(only required for private rooms)</span>
+    </label>
+    <div class="password-wrap">
+      <input id="join-password" name="password" type="password"
+             placeholder="Leave blank if public" maxlength="128"
+             autocomplete="current-password">
+      <button type="button" class="pw-toggle" onclick="togglePw('join-password', this)"
+              aria-label="Show password">👁</button>
+    </div>
+
     <button class="btn primary" type="submit">Join</button>
   </form>
 

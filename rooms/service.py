@@ -3,7 +3,9 @@ from __future__ import annotations
 import secrets
 from typing import Optional, List, Tuple
 
+from sqlalchemy import func
 from sqlalchemy.exc import IntegrityError
+from werkzeug.security import generate_password_hash
 
 from main.db import db
 from models.user import User
@@ -15,8 +17,11 @@ def _make_code(length: int = 8) -> str:
     return "".join(secrets.choice(alphabet) for _ in range(length))
 
 
-def create_room(owner_id: int, name: str, with_code: bool = True) -> Room:
+def create_room(owner_id: int, name: str, with_code: bool = True, password: str | None = None) -> Room:
     room = Room(name=name.strip(), owner_id=owner_id)
+    if password:
+        room.room_password = password
+        room.password_hash = generate_password_hash(password)
 
     if with_code:
         for _ in range(5):
@@ -58,14 +63,31 @@ def get_room(room_id: int) -> Optional[Room]:
     return Room.query.get(room_id)
 
 
-def get_user_rooms(user_id: int):
-    return (
-        db.session.query(Room)
+def get_user_rooms(user_id: int) -> list[dict]:
+    rows = (
+        db.session.query(Room, User.username, func.count(RoomMember.id))
+        .join(User, User.id == Room.owner_id)
         .join(RoomMember, RoomMember.room_id == Room.id)
         .filter(RoomMember.user_id == user_id)
+        .group_by(Room.id, User.username)
         .order_by(Room.created_at.desc())
         .all()
     )
+    return [{"room": r, "owner": uname, "member_count": cnt} for r, uname, cnt in rows]
+
+
+def get_public_rooms() -> list[dict]:
+    """All public (no password) rooms with owner name and member count."""
+    rows = (
+        db.session.query(Room, User.username, func.count(RoomMember.id))
+        .join(User, User.id == Room.owner_id)
+        .outerjoin(RoomMember, RoomMember.room_id == Room.id)
+        .filter(Room.password_hash.is_(None))
+        .group_by(Room.id, User.username)
+        .order_by(Room.created_at.desc())
+        .all()
+    )
+    return [{"room": r, "owner": uname, "member_count": cnt} for r, uname, cnt in rows]
 
 
 def find_room_by_code(code: str) -> Optional[Room]:
@@ -73,6 +95,13 @@ def find_room_by_code(code: str) -> Optional[Room]:
     if not c:
         return None
     return Room.query.filter_by(join_code=c).first()
+
+
+def verify_room_password(room: Room, password: str) -> bool:
+    """Return True if room is public OR the given password matches."""
+    if not room.is_private:
+        return True
+    return room.room_password == (password or "")
 
 
 def get_room_members(room: Room) -> List[Tuple[User, bool]]:

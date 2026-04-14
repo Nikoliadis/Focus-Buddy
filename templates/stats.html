@@ -27,10 +27,15 @@
     <div style="font-size:2rem; font-weight:800; color:#f472b6;">{{ total_fmt }}</div>
     <div class="muted" style="margin-top:.35rem;">All Time</div>
   </div>
+
+  <div class="card" style="text-align:center;">
+    <div style="font-size:2rem; font-weight:800; color:#a78bfa;">{{ best_day_fmt }}</div>
+    <div class="muted" style="margin-top:.35rem;">Best Day</div>
+  </div>
 </div>
 
 <!-- Second row -->
-<div class="grid" style="grid-template-columns: 2fr 1fr; margin-bottom:1.5rem;">
+<div class="grid" style="grid-template-columns: 2fr 1fr; margin-bottom:1.5rem; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));">
 
   <!-- Bar chart -->
   <div class="card">
@@ -77,6 +82,29 @@
 <div class="card" style="text-align:center; margin-bottom:2rem;">
   <p class="muted">No sessions yet. Join a room and start focusing!</p>
   <a class="btn primary" href="{{ url_for('rooms.rooms_index') }}">Go to Rooms</a>
+</div>
+{% endif %}
+
+<!-- Recent sessions -->
+{% if recent_sessions %}
+<div class="card" style="margin-bottom:2rem;">
+  <h3 style="margin-top:0;">Recent Sessions</h3>
+  <table style="width:100%; border-collapse:collapse;">
+    <thead>
+      <tr style="opacity:.6; font-size:.9rem; text-align:left;">
+        <th style="padding:.4rem 0;">Date</th>
+        <th style="padding:.4rem 0; text-align:right;">Duration</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for secs, fmt, dt in recent_sessions %}
+      <tr style="border-top:1px solid rgba(226,232,240,.08);">
+        <td style="padding:.55rem 0; opacity:.8;">{{ dt.strftime("%d %b %Y, %H:%M") }}</td>
+        <td style="padding:.55rem 0; text-align:right; color:#4ade80; font-weight:600;">{{ fmt }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
 </div>
 {% endif %}
 

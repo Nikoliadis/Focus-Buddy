@@ -7,6 +7,7 @@ from sqlalchemy import func
 
 from main.db import db
 from models.focus import FocusLog
+from models.user import User
 from rooms.models import Room
 
 
@@ -87,8 +88,32 @@ def get_user_stats(user_id: int) -> dict:
         chart_labels.append(d.strftime("%a"))
         chart_values.append(round(daily.get(d.strftime("%Y-%m-%d"), 0) / 60, 1))
 
+    # Best single day (all time)
+    best_day_row = (
+        db.session.query(
+            func.date(FocusLog.created_at).label("day"),
+            func.sum(FocusLog.focused_seconds).label("total")
+        )
+        .filter(FocusLog.user_id == user_id)
+        .group_by(func.date(FocusLog.created_at))
+        .order_by(func.sum(FocusLog.focused_seconds).desc())
+        .first()
+    )
+    best_day_fmt = fmt_duration(int(best_day_row.total)) if best_day_row else "—"
+
+    # Recent sessions (last 10)
+    recent = (
+        db.session.query(FocusLog)
+        .filter(FocusLog.user_id == user_id)
+        .order_by(FocusLog.created_at.desc())
+        .limit(10)
+        .all()
+    )
+
     return {
         "total_seconds": total_seconds,
+        "best_day_fmt": best_day_fmt,
+        "recent_sessions": [(r.focused_seconds, fmt_duration(r.focused_seconds), r.created_at) for r in recent],
         "total_fmt": fmt_duration(total_seconds),
         "week_seconds": week_seconds,
         "week_fmt": fmt_duration(week_seconds),
@@ -99,3 +124,38 @@ def get_user_stats(user_id: int) -> dict:
         "chart_labels": chart_labels,
         "chart_values": chart_values,
     }
+
+
+def get_leaderboard(limit: int = 10) -> list:
+    """Global top users by all-time focused seconds."""
+    now = datetime.utcnow()
+    week_start = now.replace(hour=0, minute=0, second=0, microsecond=0) - timedelta(days=6)
+
+    rows = (
+        db.session.query(User.username, func.sum(FocusLog.focused_seconds).label("total"))
+        .join(FocusLog, FocusLog.user_id == User.id)
+        .group_by(User.id, User.username)
+        .order_by(func.sum(FocusLog.focused_seconds).desc())
+        .limit(limit)
+        .all()
+    )
+
+    week_rows = (
+        db.session.query(User.id, func.sum(FocusLog.focused_seconds).label("week"))
+        .join(FocusLog, FocusLog.user_id == User.id)
+        .filter(FocusLog.created_at >= week_start)
+        .group_by(User.id)
+        .all()
+    )
+    week_map = {uid: secs for uid, secs in week_rows}
+
+    result = []
+    for i, (username, total) in enumerate(rows):
+        uid_row = db.session.query(User.id).filter(User.username == username).scalar()
+        result.append({
+            "rank": i + 1,
+            "username": username,
+            "total_fmt": fmt_duration(int(total)),
+            "week_fmt": fmt_duration(int(week_map.get(uid_row, 0))),
+        })
+    return result

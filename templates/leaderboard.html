@@ -1,0 +1,53 @@
+{% extends "base.html" %}
+{% block title %}Leaderboard | FocusBuddy{% endblock %}
+
+{% block content %}
+<section class="hero" style="padding-bottom:1rem;">
+  <h1>🏆 Leaderboard</h1>
+  <p class="muted">Top focused users on FocusBuddy.</p>
+</section>
+
+<div class="card" style="margin-bottom:2rem;">
+  {% if entries %}
+  <table style="width:100%; border-collapse:collapse;">
+    <thead>
+      <tr style="opacity:.6; font-size:.9rem; text-align:left;">
+        <th style="padding:.5rem 0; width:3rem;">#</th>
+        <th style="padding:.5rem 0;">User</th>
+        <th style="padding:.5rem 0; text-align:right;">This Week</th>
+        <th style="padding:.5rem 0; text-align:right;">All Time</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for entry in entries %}
+      <tr style="border-top:1px solid rgba(226,232,240,.08);
+                 {% if entry.username == session.username %}background:rgba(96,165,250,.06);{% endif %}">
+        <td style="padding:.7rem 0;">
+          {% if entry.rank == 1 %}🥇
+          {% elif entry.rank == 2 %}🥈
+          {% elif entry.rank == 3 %}🥉
+          {% else %}<span style="opacity:.5;">{{ entry.rank }}</span>
+          {% endif %}
+        </td>
+        <td style="padding:.7rem 0; font-weight:{% if entry.username == session.username %}700{% else %}400{% endif %};">
+          {{ entry.username | title }}
+          {% if entry.username == session.username %}
+            <span class="muted" style="font-size:.8rem; margin-left:.35rem;">(you)</span>
+          {% endif %}
+        </td>
+        <td style="padding:.7rem 0; text-align:right; opacity:.8;">{{ entry.week_fmt }}</td>
+        <td style="padding:.7rem 0; text-align:right; font-weight:600; color:#60a5fa;">{{ entry.total_fmt }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% else %}
+  <p class="muted" style="text-align:center;">No sessions recorded yet. Be the first!</p>
+  {% endif %}
+</div>
+
+<div style="text-align:center; margin-bottom:2rem;">
+  <a class="btn secondary" href="{{ url_for('main.stats') }}">My Stats</a>
+  <a class="btn primary" href="{{ url_for('rooms.rooms_index') }}">Go Focus</a>
+</div>
+{% endblock %}
