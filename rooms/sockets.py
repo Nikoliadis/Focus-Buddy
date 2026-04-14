@@ -1,12 +1,14 @@
 from __future__ import annotations
 
+from datetime import datetime
+
 from flask import session
 from flask_socketio import join_room, leave_room, emit
 
 from main.socketio_ext import socketio
 from .models import RoomMember
 from .service import get_room
-from .presence_store import PRESENCE
+from .presence_store import PRESENCE, LAST_SEEN
 from .sessions_service import (
     get_active_session,
     start_session,
@@ -23,9 +25,14 @@ def _room_key(room_id: int) -> str:
 
 def _broadcast_presence(room_id: int) -> None:
     online_ids = sorted(list(PRESENCE.get(room_id, set())))
+    last_seen = {
+        str(uid): ts.isoformat()
+        for uid, ts in LAST_SEEN.items()
+        if uid not in PRESENCE.get(room_id, set())
+    }
     emit(
         "presence:update",
-        {"room_id": room_id, "count": len(online_ids), "online_ids": online_ids},
+        {"room_id": room_id, "count": len(online_ids), "online_ids": online_ids, "last_seen": last_seen},
         room=_room_key(room_id),
     )
 
@@ -82,10 +89,12 @@ def on_room_leave(data):
 
     leave_room(_room_key(room_id))
 
-    if room_id in PRESENCE and int(user_id) in PRESENCE[room_id]:
-        PRESENCE[room_id].remove(int(user_id))
+    uid = int(user_id)
+    if room_id in PRESENCE and uid in PRESENCE[room_id]:
+        PRESENCE[room_id].remove(uid)
         if not PRESENCE[room_id]:
             PRESENCE.pop(room_id, None)
+        LAST_SEEN[uid] = datetime.utcnow()
     _broadcast_presence(room_id)
 
 
@@ -105,6 +114,8 @@ def on_disconnect():
             empty_rooms.append(rid)
     for rid in empty_rooms:
         PRESENCE.pop(rid, None)
+
+    LAST_SEEN[uid] = datetime.utcnow()
 
 
 def _require_owner(room_id: int, user_id: int) -> bool:

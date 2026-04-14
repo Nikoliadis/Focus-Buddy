@@ -344,6 +344,12 @@ a {
   animation: pulse-online 2.5s ease-in-out infinite;
 }
 
+.presence-dot.online.focusing {
+  background: #60a5fa;
+  box-shadow: 0 0 0 2px rgba(96, 165, 250, .3);
+  animation: pulse-focusing 1.4s ease-in-out infinite;
+}
+
 .presence-dot.offline {
   background: rgba(226, 232, 240, .18);
 }
@@ -351,4 +357,9 @@ a {
 @keyframes pulse-online {
   0%, 100% { box-shadow: 0 0 0 2px rgba(74, 222, 128, .25); }
   50%       { box-shadow: 0 0 0 5px rgba(74, 222, 128, .08); }
+}
+
+@keyframes pulse-focusing {
+  0%, 100% { box-shadow: 0 0 0 2px rgba(96, 165, 250, .3); }
+  50%       { box-shadow: 0 0 0 6px rgba(96, 165, 250, .08); }
 }

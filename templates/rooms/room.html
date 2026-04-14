@@ -59,6 +59,7 @@
           {% if user.id == room.owner_id %}
             <strong>👑</strong>
           {% endif %}
+          <span id="ls-{{ user.id }}" class="muted" style="font-size:.8rem; margin:0;"></span>
         </span>
       </li>
       {% endfor %}
@@ -170,21 +171,35 @@
     } catch (_) {}
   }
 
-  function applyPresence(onlineIds) {
-    const onlineSet = new Set(onlineIds || []);
+  let _sessionFocusing = false;
+
+  function timeAgo(isoStr) {
+    const diff = Math.floor((Date.now() - new Date(isoStr + "Z")) / 1000);
+    if (diff < 60)   return "just now";
+    if (diff < 3600) return `${Math.floor(diff / 60)}m ago`;
+    if (diff < 86400) return `${Math.floor(diff / 3600)}h ago`;
+    return `${Math.floor(diff / 86400)}d ago`;
+  }
+
+  function applyPresence(onlineIds, lastSeen) {
+    const onlineSet = new Set((onlineIds || []).map(Number));
     const countEl = document.getElementById("members-count");
     if (countEl) countEl.textContent = onlineSet.size;
 
     document.querySelectorAll("[data-user-id]").forEach(el => {
       const uid = parseInt(el.dataset.userId, 10);
       const dot = document.getElementById(`dot-${uid}`);
+      const lsEl = document.getElementById(`ls-${uid}`);
       if (!dot) return;
-      if (onlineSet.has(uid)) {
-        dot.classList.add("online");
-        dot.classList.remove("offline");
-      } else {
-        dot.classList.add("offline");
-        dot.classList.remove("online");
+
+      const isOnline = onlineSet.has(uid);
+      dot.classList.toggle("online", isOnline);
+      dot.classList.toggle("offline", !isOnline);
+      dot.classList.toggle("focusing", isOnline && _sessionFocusing);
+
+      if (lsEl) {
+        const ts = lastSeen && lastSeen[uid];
+        lsEl.textContent = (!isOnline && ts) ? `· ${timeAgo(ts)}` : "";
       }
     });
   }
@@ -194,7 +209,7 @@
       const res = await fetch("{{ url_for('rooms.room_presence', room_id=room.id) }}", { cache: "no-store" });
       if (!res.ok) return;
       const data = await res.json();
-      applyPresence(data.online_ids);
+      applyPresence(data.online_ids, data.last_seen);
     } catch (_) {}
   }
 
@@ -227,11 +242,16 @@
     const timerEl = document.getElementById("fs-timer");
     if (statusEl) statusEl.textContent = data.status || "idle";
     if (timerEl) timerEl.textContent = fmt(data.remaining_seconds ?? 1500);
+
+    _sessionFocusing = data.status === "running";
+    document.querySelectorAll(".presence-dot.online").forEach(dot => {
+      dot.classList.toggle("focusing", _sessionFocusing);
+    });
   });
 
   socket.on("presence:update", (data) => {
     if (!data || data.room_id !== ROOM_ID) return;
-    applyPresence(data.online_ids);
+    applyPresence(data.online_ids, data.last_seen);
   });
 
   socket.on("error", (data) => {
