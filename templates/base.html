@@ -9,6 +9,9 @@
   <link rel="stylesheet"
         href="{{ url_for('static', filename='css/style.css') }}?v={{ STATIC_VERSION }}">
 
+  <!-- Theme: runs BEFORE body renders to prevent flash -->
+  <script>if(localStorage.getItem("fb-theme")==="light")document.documentElement.classList.add("light");</script>
+
   {% block head %}{% endblock %}
 </head>
 <body>
@@ -99,17 +102,14 @@
 
   <script>
     // ── Theme ────────────────────────────────────────────────────────────────
-    (function applyStoredTheme() {
-      const theme = localStorage.getItem("fb-theme");
-      if (theme === "light") {
-        document.body.classList.add("light");
-        const btn = document.getElementById("theme-toggle");
-        if (btn) btn.textContent = "☀️";
-      }
+    // Sync button icon on page load (class already applied in <head>)
+    (function() {
+      const btn = document.getElementById("theme-toggle");
+      if (btn && localStorage.getItem("fb-theme") === "light") btn.textContent = "☀️";
     })();
 
     function toggleTheme() {
-      const isLight = document.body.classList.toggle("light");
+      const isLight = document.documentElement.classList.toggle("light");
       localStorage.setItem("fb-theme", isLight ? "light" : "dark");
       const btn = document.getElementById("theme-toggle");
       if (btn) btn.textContent = isLight ? "☀️" : "🌙";

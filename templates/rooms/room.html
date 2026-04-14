@@ -38,7 +38,7 @@
           value="{{ invite_link }}"
           id="inviteLink"
           readonly
-          style="flex:1; padding:.6rem; border-radius:.6rem; border:1px solid rgba(255,255,255,.15); background:rgba(255,255,255,.05); color:#fff;"
+          style="flex:1; padding:.6rem; border-radius:.6rem; border:1px solid var(--border); background:var(--surface); color:var(--text);"
         />
 
         <button
@@ -60,7 +60,7 @@
     <div style="display:flex; gap:.5rem; align-items:center; flex-wrap:wrap;">
       <input id="roomPasswordDisplay" type="password"
              value="{{ room.room_password }}" readonly
-             style="flex:1; padding:.6rem; border-radius:.6rem; border:1px solid rgba(255,255,255,.15); background:rgba(255,255,255,.05); color:#fff; letter-spacing:.1em;">
+             style="flex:1; padding:.6rem; border-radius:.6rem; border:1px solid var(--border); background:var(--surface); color:var(--text); letter-spacing:.1em;">
       <button type="button" class="btn secondary pw-toggle"
               onclick="togglePw('roomPasswordDisplay', this)"
               aria-label="Show password">👁</button>
@@ -114,9 +114,11 @@
       <form method="post" action="{{ url_for('rooms.room_session_start', room_id=room.id) }}" style="margin:0; display:flex; gap:.5rem; align-items:center; flex-wrap:wrap;">
         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
         <label style="font-size:.85rem; opacity:.7; margin:0;">Focus</label>
-        <input name="minutes" type="number" min="1" max="180" value="25" style="width:70px;">
+        <input name="minutes" type="number" min="1" max="180" value="25"
+               style="width:70px; padding:.4rem .5rem; border-radius:.6rem; border:1px solid var(--border); background:var(--surface); color:var(--text);">
         <label style="font-size:.85rem; opacity:.7; margin:0;">Break</label>
-        <input name="break_minutes" type="number" min="1" max="60" value="5" style="width:60px;">
+        <input name="break_minutes" type="number" min="1" max="60" value="5"
+               style="width:60px; padding:.4rem .5rem; border-radius:.6rem; border:1px solid var(--border); background:var(--surface); color:var(--text);">
         <button class="btn primary" type="submit">Start</button>
       </form>
 

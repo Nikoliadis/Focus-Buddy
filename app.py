@@ -58,6 +58,7 @@ def create_app() -> Flask:
         return {
             "year": datetime.now().year,
             "csrf_token": generate_csrf_token,
+            "STATIC_VERSION": "4",
         }
 
     # ------------------------------------------------------------------ #

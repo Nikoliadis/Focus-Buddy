@@ -8,7 +8,7 @@
   --muted: rgba(226,232,240,.55);
 }
 
-body.light {
+html.light {
   --bg: #f1f5f9;
   --surface: #ffffff;
   --surface2: rgba(0,0,0,.04);
@@ -17,8 +17,50 @@ body.light {
   --muted: rgba(15,23,42,.5);
 }
 
+/* explicit overrides so light mode works even without variable inheritance */
+html.light,
+html.light body {
+  background: #f1f5f9;
+  color: #0f172a;
+}
+
+html.light .header,
+html.light .footer {
+  background: #f1f5f9;
+  border-color: rgba(0,0,0,.1);
+}
+
+html.light .card,
+html.light .auth-card {
+  background: rgba(0,0,0,.04);
+  border-color: rgba(0,0,0,.1);
+  color: #0f172a;
+}
+
+html.light .muted {
+  opacity: .6;
+  color: #0f172a;
+}
+
+html.light .flash {
+  background: #ffffff;
+  color: #0f172a;
+  border-color: rgba(0,0,0,.12);
+}
+
+html.light .auth-card input,
+html.light input[type="text"],
+html.light input[type="number"],
+html.light input[type="password"],
+html.light input[type="email"] {
+  background: #ffffff;
+  color: #0f172a;
+  border-color: rgba(0,0,0,.15);
+}
+
 html {
   scroll-behavior: smooth;
+  background: var(--bg);
 }
 
 body {
@@ -110,10 +152,11 @@ a {
 .flash {
   padding: .85rem 1rem;
   border-radius: 1rem;
-  border: 1px solid rgba(226,232,240,.14);
-  background: rgba(15,23,42,.92);
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--text);
   backdrop-filter: blur(10px);
-  box-shadow: 0 18px 40px rgba(0,0,0,.35);
+  box-shadow: 0 18px 40px rgba(0,0,0,.2);
   transform: translateX(8px);
   opacity: 0;
   animation: toastIn .18s ease forwards;
