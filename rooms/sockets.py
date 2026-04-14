@@ -8,7 +8,7 @@ from flask_socketio import join_room, leave_room, emit
 from main.socketio_ext import socketio
 from .models import RoomMember
 from .service import get_room
-from .presence_store import PRESENCE, LAST_SEEN
+from .presence_store import PRESENCE, LAST_SEEN, ROOM_CYCLES
 from .sessions_service import (
     get_active_session,
     start_session,
@@ -48,13 +48,16 @@ def _is_owner(room_id: int, user_id: int) -> bool:
 
 def _session_payload(room_id: int):
     s = get_active_session(room_id)
+    cycle = ROOM_CYCLES.get(room_id, {"phase": "focus", "count": 1})
     if not s:
-        return {"status": "idle", "remaining_seconds": 25 * 60}
+        return {"status": "idle", "remaining_seconds": 25 * 60, "phase": cycle["phase"], "cycle_count": cycle["count"]}
     return {
         "status": s.status,
         "remaining_seconds": s.remaining_seconds(),
         "duration_seconds": s.duration_seconds,
         "started_by": s.started_by,
+        "phase": cycle["phase"],
+        "cycle_count": cycle["count"],
     }
 
 
@@ -143,6 +146,8 @@ def on_timer_start(data):
         return
 
     minutes = max(1, min(minutes, 180))
+    break_minutes = max(1, min(int(data.get("break_minutes") or 5), 60))
+    ROOM_CYCLES[room_id] = {"phase": "focus", "count": 1, "break_minutes": break_minutes}
     start_session(room_id, int(user_id), minutes * 60)
 
     emit("timer:update", {"room_id": room_id, **_session_payload(room_id)}, room=_room_key(room_id))
@@ -192,6 +197,38 @@ def on_timer_reset(data):
     s = get_active_session(room_id) or None
     if s:
         reset_session(s, int(user_id))
+
+    emit("timer:update", {"room_id": room_id, **_session_payload(room_id)}, room=_room_key(room_id))
+
+
+@socketio.on("timer:cycle_next")
+def on_timer_cycle_next(data):
+    room_id = int(data.get("room_id") or 0)
+    user_id = session.get("user_id")
+    if not user_id or not room_id:
+        return
+    if not _require_owner(room_id, int(user_id)):
+        return
+
+    # End current session
+    s = get_active_session(room_id)
+    if s:
+        end_session(s, int(user_id))
+
+    # Advance cycle
+    current = ROOM_CYCLES.get(room_id, {"phase": "focus", "count": 1, "break_minutes": 5})
+    break_minutes = current.get("break_minutes", 5)
+    if current["phase"] == "focus":
+        next_phase = "break"
+        next_duration = break_minutes * 60
+        next_count = current["count"]
+    else:
+        next_phase = "focus"
+        next_duration = 25 * 60
+        next_count = current["count"] + 1
+
+    ROOM_CYCLES[room_id] = {"phase": next_phase, "count": next_count, "break_minutes": break_minutes}
+    start_session(room_id, int(user_id), next_duration)
 
     emit("timer:update", {"room_id": room_id, **_session_payload(room_id)}, room=_room_key(room_id))
 

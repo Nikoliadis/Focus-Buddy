@@ -67,7 +67,13 @@
   </div>
 
   <div class="card" style="margin-top:1rem;">
-    <h3 style="margin-top:0;">Focus Session</h3>
+    <div style="display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:.5rem; margin-bottom:.25rem;">
+      <h3 style="margin:0;">Focus Session</h3>
+      <div style="display:flex; gap:.65rem; align-items:center;">
+        <span id="fs-phase" style="font-size:.95rem;">🎯 Focus</span>
+        <span id="fs-cycle" class="muted" style="font-size:.85rem; margin:0;">Cycle 1</span>
+      </div>
+    </div>
 
     <p class="muted" style="margin:.25rem 0 0;">
       Status: <strong id="fs-status">idle</strong>
@@ -76,9 +82,12 @@
     <div style="display:flex; gap:.75rem; align-items:center; margin-top:.75rem; flex-wrap:wrap;">
       <div style="font-size:2rem; font-weight:800;" id="fs-timer">25:00</div>
 
-      <form method="post" action="{{ url_for('rooms.room_session_start', room_id=room.id) }}" style="margin:0; display:flex; gap:.5rem; align-items:center;">
+      <form method="post" action="{{ url_for('rooms.room_session_start', room_id=room.id) }}" style="margin:0; display:flex; gap:.5rem; align-items:center; flex-wrap:wrap;">
         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-        <input name="minutes" type="number" min="1" max="180" value="25" style="width:90px;">
+        <label style="font-size:.85rem; opacity:.7; margin:0;">Focus</label>
+        <input name="minutes" type="number" min="1" max="180" value="25" style="width:70px;">
+        <label style="font-size:.85rem; opacity:.7; margin:0;">Break</label>
+        <input name="break_minutes" type="number" min="1" max="60" value="5" style="width:60px;">
         <button class="btn primary" type="submit">Start</button>
       </form>
 
@@ -132,6 +141,7 @@
 </section>
 
 <script>
+  // ── Utilities ──────────────────────────────────────────────────────────
   function fmt(seconds) {
     const m = String(Math.floor(seconds / 60)).padStart(2, "0");
     const s = String(Math.floor(seconds % 60)).padStart(2, "0");
@@ -144,10 +154,7 @@
     try {
       if (navigator.clipboard && navigator.clipboard.writeText) {
         await navigator.clipboard.writeText(input.value);
-      } else {
-        input.select();
-        document.execCommand('copy');
-      }
+      } else { input.select(); document.execCommand('copy'); }
       const btn = input.nextElementSibling;
       if (btn && btn.tagName === 'BUTTON') {
         const orig = btn.textContent;
@@ -157,26 +164,135 @@
     } catch (_) {}
   }
 
-  async function pollSession() {
+  function showToast(msg, type = "info") {
+    let container = document.querySelector(".flashes");
+    if (!container) {
+      container = document.createElement("div");
+      container.className = "flashes";
+      document.body.appendChild(container);
+    }
+    const toast = document.createElement("div");
+    toast.className = `flash flash-${type}`;
+    toast.textContent = msg;
+    container.appendChild(toast);
+    setTimeout(() => {
+      toast.classList.add("is-hiding");
+      toast.addEventListener("animationend", () => toast.remove(), { once: true });
+    }, 4000);
+  }
+
+  // ── Sound ───────────────────────────────────────────────────────────────
+  function playDoneSound(phase) {
     try {
-      const res = await fetch("{{ url_for('rooms.room_session_status', room_id=room.id) }}", { cache: "no-store" });
-      if (!res.ok) return;
-      const data = await res.json();
-
-      const statusEl = document.getElementById("fs-status");
-      const timerEl = document.getElementById("fs-timer");
-
-      if (statusEl) statusEl.textContent = data.status || "idle";
-      if (timerEl) timerEl.textContent = fmt(data.remaining_seconds ?? 1500);
+      const ctx = new (window.AudioContext || window.webkitAudioContext)();
+      // focus done → ascending (C-E-G), break done → descending (G-E-C)
+      const freqs = phase === "focus" ? [523, 659, 784] : [784, 659, 523];
+      freqs.forEach((freq, i) => {
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+        osc.frequency.value = freq;
+        const t = ctx.currentTime + i * 0.18;
+        gain.gain.setValueAtTime(0.25, t);
+        gain.gain.exponentialRampToValueAtTime(0.001, t + 0.35);
+        osc.start(t);
+        osc.stop(t + 0.35);
+      });
     } catch (_) {}
   }
 
+  // ── Pomodoro cycle ──────────────────────────────────────────────────────
   let _sessionFocusing = false;
+  let _phaseCompleted  = false;
+  let _cycleCountdown  = null;
 
+  function handleTimerData(data) {
+    const rem        = data.remaining_seconds ?? 1500;
+    const status     = data.status || "idle";
+    const phase      = data.phase || "focus";
+    const cycleCount = data.cycle_count || 1;
+
+    const statusEl = document.getElementById("fs-status");
+    const timerEl  = document.getElementById("fs-timer");
+    const phaseEl  = document.getElementById("fs-phase");
+    const cycleEl  = document.getElementById("fs-cycle");
+
+    if (statusEl) statusEl.textContent = status;
+    if (timerEl)  timerEl.textContent  = fmt(rem);
+    if (phaseEl)  phaseEl.textContent  = phase === "focus" ? "🎯 Focus" : "☕ Break";
+    if (cycleEl)  cycleEl.textContent  = `Cycle ${cycleCount}`;
+
+    // Reset completed flag when a new session is running
+    if (status === "running" && rem > 0) _phaseCompleted = false;
+
+    // Detect natural end
+    if (status === "running" && rem === 0 && !_phaseCompleted) {
+      _phaseCompleted = true;
+      onPhaseComplete(phase);
+    }
+
+    // Focusing dot colour
+    _sessionFocusing = status === "running" && phase === "focus";
+    document.querySelectorAll(".presence-dot.online").forEach(dot => {
+      dot.classList.toggle("focusing", _sessionFocusing);
+    });
+  }
+
+  function onPhaseComplete(completedPhase) {
+    playDoneSound(completedPhase);
+    const msg = completedPhase === "focus"
+      ? "🎉 Focus complete! Break time."
+      : "💪 Break over! Time to focus.";
+    showToast(msg, "success");
+    if (IS_OWNER) startCycleCountdown(completedPhase);
+  }
+
+  function startCycleCountdown(completedPhase) {
+    if (_cycleCountdown) { clearInterval(_cycleCountdown); _cycleCountdown = null; }
+    const existing = document.getElementById("cycle-toast");
+    if (existing) existing.remove();
+
+    let secs = 5;
+    let container = document.querySelector(".flashes");
+    if (!container) {
+      container = document.createElement("div");
+      container.className = "flashes";
+      document.body.appendChild(container);
+    }
+    const toast = document.createElement("div");
+    toast.id = "cycle-toast";
+    toast.className = "flash flash-info";
+    toast.style.cursor = "default";
+
+    const nextPhase = completedPhase === "focus" ? "break" : "focus";
+    const render = () => {
+      toast.innerHTML = `Starting ${nextPhase} in <strong>${secs}s</strong>… <button onclick="cancelCycle()" style="margin-left:.5rem;background:none;border:none;color:inherit;cursor:pointer;opacity:.7;text-decoration:underline;">Cancel</button>`;
+    };
+    render();
+    container.appendChild(toast);
+
+    _cycleCountdown = setInterval(() => {
+      secs--;
+      if (secs <= 0) {
+        clearInterval(_cycleCountdown); _cycleCountdown = null;
+        toast.remove();
+        socket.emit("timer:cycle_next", { room_id: ROOM_ID, phase: completedPhase });
+      } else { render(); }
+    }, 1000);
+  }
+
+  function cancelCycle() {
+    if (_cycleCountdown) { clearInterval(_cycleCountdown); _cycleCountdown = null; }
+    const t = document.getElementById("cycle-toast");
+    if (t) t.remove();
+  }
+
+  // ── Presence ────────────────────────────────────────────────────────────
   function timeAgo(isoStr) {
     const diff = Math.floor((Date.now() - new Date(isoStr + "Z")) / 1000);
-    if (diff < 60)   return "just now";
-    if (diff < 3600) return `${Math.floor(diff / 60)}m ago`;
+    if (diff < 60)    return "just now";
+    if (diff < 3600)  return `${Math.floor(diff / 60)}m ago`;
     if (diff < 86400) return `${Math.floor(diff / 3600)}h ago`;
     return `${Math.floor(diff / 86400)}d ago`;
   }
@@ -188,20 +304,29 @@
 
     document.querySelectorAll("[data-user-id]").forEach(el => {
       const uid = parseInt(el.dataset.userId, 10);
-      const dot = document.getElementById(`dot-${uid}`);
+      const dot  = document.getElementById(`dot-${uid}`);
       const lsEl = document.getElementById(`ls-${uid}`);
       if (!dot) return;
 
       const isOnline = onlineSet.has(uid);
-      dot.classList.toggle("online", isOnline);
-      dot.classList.toggle("offline", !isOnline);
-      dot.classList.toggle("focusing", isOnline && _sessionFocusing);
+      dot.classList.toggle("online",    isOnline);
+      dot.classList.toggle("offline",   !isOnline);
+      dot.classList.toggle("focusing",  isOnline && _sessionFocusing);
 
       if (lsEl) {
         const ts = lastSeen && lastSeen[uid];
         lsEl.textContent = (!isOnline && ts) ? `· ${timeAgo(ts)}` : "";
       }
     });
+  }
+
+  // ── Polling ─────────────────────────────────────────────────────────────
+  async function pollSession() {
+    try {
+      const res = await fetch("{{ url_for('rooms.room_session_status', room_id=room.id) }}", { cache: "no-store" });
+      if (!res.ok) return;
+      handleTimerData(await res.json());
+    } catch (_) {}
   }
 
   async function pollPresence() {
@@ -226,27 +351,13 @@
 
   const socket = io();
 
-  function fmt(seconds) {
-    const m = String(Math.floor(seconds / 60)).padStart(2, "0");
-    const s = String(Math.floor(seconds % 60)).padStart(2, "0");
-    return `${m}:${s}`;
-  }
-
   socket.on("connect", () => {
     socket.emit("room:join", { room_id: ROOM_ID });
   });
 
   socket.on("timer:update", (data) => {
     if (!data || data.room_id !== ROOM_ID) return;
-    const statusEl = document.getElementById("fs-status");
-    const timerEl = document.getElementById("fs-timer");
-    if (statusEl) statusEl.textContent = data.status || "idle";
-    if (timerEl) timerEl.textContent = fmt(data.remaining_seconds ?? 1500);
-
-    _sessionFocusing = data.status === "running";
-    document.querySelectorAll(".presence-dot.online").forEach(dot => {
-      dot.classList.toggle("focusing", _sessionFocusing);
-    });
+    handleTimerData(data);
   });
 
   socket.on("presence:update", (data) => {
@@ -255,29 +366,7 @@
   });
 
   socket.on("error", (data) => {
-    console.log("socket error:", data);
-  });
-
-  document.addEventListener("DOMContentLoaded", () => {
-    const startForm = document.getElementById("fs-start-form");
-    const pauseBtn = document.getElementById("fs-pause");
-    const resumeBtn = document.getElementById("fs-resume");
-    const resetBtn = document.getElementById("fs-reset");
-    const endBtn = document.getElementById("fs-end");
-
-    if (startForm) {
-      startForm.addEventListener("submit", (e) => {
-        e.preventDefault();
-        if (!IS_OWNER) return;
-        const minutes = Number(startForm.querySelector("input[name='minutes']").value || 25);
-        socket.emit("timer:start", { room_id: ROOM_ID, minutes });
-      });
-    }
-
-    if (pauseBtn) pauseBtn.addEventListener("click", () => IS_OWNER && socket.emit("timer:pause", { room_id: ROOM_ID }));
-    if (resumeBtn) resumeBtn.addEventListener("click", () => IS_OWNER && socket.emit("timer:resume", { room_id: ROOM_ID }));
-    if (resetBtn) resetBtn.addEventListener("click", () => IS_OWNER && socket.emit("timer:reset", { room_id: ROOM_ID }));
-    if (endBtn) endBtn.addEventListener("click", () => IS_OWNER && socket.emit("timer:end", { room_id: ROOM_ID }));
+    console.warn("socket error:", data);
   });
 
   window.addEventListener("beforeunload", () => {

@@ -8,7 +8,7 @@ from models.user import User
 
 from . import rooms_bp
 from .models import RoomMember
-from .presence_store import PRESENCE, LAST_SEEN
+from .presence_store import PRESENCE, LAST_SEEN, ROOM_CYCLES
 from .service import (
     create_room,
     get_user_rooms,
@@ -180,12 +180,15 @@ def room_session_status(room_id: int):
         return jsonify({"error": "Forbidden"}), 403
 
     s = get_active_session(room_id) or get_latest_session(room_id)
+    cycle = ROOM_CYCLES.get(room_id, {"phase": "focus", "count": 1})
 
     if not s:
         return jsonify({
             "status": "idle",
             "duration_seconds": 25 * 60,
             "remaining_seconds": 25 * 60,
+            "phase": cycle["phase"],
+            "cycle_count": cycle["count"],
         })
 
     return jsonify({
@@ -193,6 +196,8 @@ def room_session_status(room_id: int):
         "duration_seconds": s.duration_seconds,
         "remaining_seconds": s.remaining_seconds(),
         "started_by": s.started_by,
+        "phase": cycle["phase"],
+        "cycle_count": cycle["count"],
     })
 
 
@@ -213,7 +218,14 @@ def room_session_start(room_id: int):
     except ValueError:
         minutes = 25
 
+    try:
+        break_minutes = int(request.form.get("break_minutes") or "5")
+    except ValueError:
+        break_minutes = 5
+
     minutes = max(1, min(minutes, 180))
+    break_minutes = max(1, min(break_minutes, 60))
+    ROOM_CYCLES[room_id] = {"phase": "focus", "count": 1, "break_minutes": break_minutes}
     start_session(room_id=room_id, user_id=session["user_id"], duration_seconds=minutes * 60)
 
     flash("Focus session started ✅", "success")

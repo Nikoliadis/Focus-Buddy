@@ -7,3 +7,6 @@ PRESENCE: Dict[int, Set[int]] = {}
 
 # user_id -> last seen datetime (set on disconnect or room:leave)
 LAST_SEEN: Dict[int, datetime] = {}
+
+# room_id -> {"phase": "focus"|"break", "count": int}
+ROOM_CYCLES: Dict[int, dict] = {}
