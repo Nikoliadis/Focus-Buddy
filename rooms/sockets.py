@@ -1,14 +1,12 @@
 from __future__ import annotations
 
-from datetime import datetime
-from typing import Dict, Set
-
 from flask import session
 from flask_socketio import join_room, leave_room, emit
 
 from main.socketio_ext import socketio
 from .models import RoomMember
 from .service import get_room
+from .presence_store import PRESENCE
 from .sessions_service import (
     get_active_session,
     start_session,
@@ -18,18 +16,16 @@ from .sessions_service import (
     end_session,
 )
 
-PRESENCE: Dict[int, Set[int]] = {}
-
 
 def _room_key(room_id: int) -> str:
     return f"room:{room_id}"
 
 
 def _broadcast_presence(room_id: int) -> None:
-    users = sorted(list(PRESENCE.get(room_id, set())))
+    online_ids = sorted(list(PRESENCE.get(room_id, set())))
     emit(
         "presence:update",
-        {"room_id": room_id, "count": len(users), "users": users},
+        {"room_id": room_id, "count": len(online_ids), "online_ids": online_ids},
         room=_room_key(room_id),
     )
 

@@ -111,6 +111,15 @@
 
     });
 
+    function togglePw(inputId, btn) {
+      const input = document.getElementById(inputId);
+      if (!input) return;
+      const show = input.type === "password";
+      input.type = show ? "text" : "password";
+      btn.textContent = show ? "🙈" : "👁";
+      btn.setAttribute("aria-label", show ? "Hide password" : "Show password");
+    }
+
     function copyInviteLink() {
       const input = document.getElementById("inviteLink");
       if (!input) return;

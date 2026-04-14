@@ -52,15 +52,16 @@
 
     <ul id="members-list" style="list-style:none; padding:0; margin:0; display:grid; gap:.45rem;">
       {% for user, is_room_owner in members %}
-  <li style="display:flex; align-items:center; justify-content:space-between;">
-    <span>
-      {{ user.username | title }}
-      {% if user.id == room.owner_id %}
-        <strong style="margin-left:.35rem;">👑</strong>
-      {% endif %}
-    </span>
-  </li>
-{% endfor %}
+      <li data-user-id="{{ user.id }}" style="display:flex; align-items:center; justify-content:space-between;">
+        <span style="display:flex; align-items:center; gap:.55rem;">
+          <span class="presence-dot offline" id="dot-{{ user.id }}"></span>
+          {{ user.username | title }}
+          {% if user.id == room.owner_id %}
+            <strong>👑</strong>
+          {% endif %}
+        </span>
+      </li>
+      {% endfor %}
     </ul>
   </div>
 
@@ -169,14 +170,31 @@
     } catch (_) {}
   }
 
+  function applyPresence(onlineIds) {
+    const onlineSet = new Set(onlineIds || []);
+    const countEl = document.getElementById("members-count");
+    if (countEl) countEl.textContent = onlineSet.size;
+
+    document.querySelectorAll("[data-user-id]").forEach(el => {
+      const uid = parseInt(el.dataset.userId, 10);
+      const dot = document.getElementById(`dot-${uid}`);
+      if (!dot) return;
+      if (onlineSet.has(uid)) {
+        dot.classList.add("online");
+        dot.classList.remove("offline");
+      } else {
+        dot.classList.add("offline");
+        dot.classList.remove("online");
+      }
+    });
+  }
+
   async function pollPresence() {
     try {
       const res = await fetch("{{ url_for('rooms.room_presence', room_id=room.id) }}", { cache: "no-store" });
       if (!res.ok) return;
       const data = await res.json();
-
-      const countEl = document.getElementById("members-count");
-      if (countEl) countEl.textContent = data.count ?? 0;
+      applyPresence(data.online_ids);
     } catch (_) {}
   }
 
@@ -213,8 +231,7 @@
 
   socket.on("presence:update", (data) => {
     if (!data || data.room_id !== ROOM_ID) return;
-    const countEl = document.getElementById("members-count");
-    if (countEl) countEl.textContent = data.count ?? 0;
+    applyPresence(data.online_ids);
   });
 
   socket.on("error", (data) => {

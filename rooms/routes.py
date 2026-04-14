@@ -8,6 +8,7 @@ from models.user import User
 
 from . import rooms_bp
 from .models import RoomMember
+from .presence_store import PRESENCE
 from .service import (
     create_room,
     get_user_rooms,
@@ -294,5 +295,6 @@ def room_presence(room_id: int):
         .all()
     )
 
+    online_ids = list(PRESENCE.get(room_id, set()))
     members = [{"user_id": uid, "username": uname} for (uname, uid) in rows]
-    return jsonify({"count": len(members), "members": members})
+    return jsonify({"count": len(online_ids), "members": members, "online_ids": online_ids})
