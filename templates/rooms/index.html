@@ -42,6 +42,7 @@
                     action="{{ url_for('rooms.room_delete', room_id=room.id) }}"
                     onsubmit="return confirm('Delete this room? This cannot be undone.');"
                     style="margin:0;">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                 <button type="submit" class="btn danger">
                   Delete
                 </button>

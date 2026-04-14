@@ -6,6 +6,7 @@
   <h1>Join Room</h1>
 
   <form method="post" action="{{ url_for('rooms.rooms_join_post') }}">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
     <label for="code">Room code</label>
     <input id="code" name="code" required value="{{ prefill_code or '' }}" />
     <button class="btn primary" type="submit">Join</button>

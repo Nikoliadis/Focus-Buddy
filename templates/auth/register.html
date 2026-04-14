@@ -6,6 +6,7 @@
   <h1>Register</h1>
 
   <form method="post" action="{{ url_for('auth.register_post') }}">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
     <label for="username">Username</label>
     <input id="username" name="username" autocomplete="username" required>
 

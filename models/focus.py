@@ -7,8 +7,12 @@ from main.db import db
 class FocusSession(db.Model):
     __tablename__ = "focus_sessions"
 
+    __table_args__ = (
+        db.Index("ix_focus_sessions_room_status", "room_id", "status"),
+    )
+
     id = db.Column(db.Integer, primary_key=True)
-    room_id = db.Column(db.Integer, nullable=False, index=True)
+    room_id = db.Column(db.Integer, nullable=False)
     started_by = db.Column(db.Integer, nullable=False)
 
     # idle | running | paused | ended

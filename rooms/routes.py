@@ -49,8 +49,8 @@ def rooms_create_post():
     name = (request.form.get("name") or "").strip()
     with_code = (request.form.get("with_code") == "on")
 
-    if len(name) < 3:
-        flash("Room name must be at least 3 characters.", "error")
+    if len(name) < 3 or len(name) > 50:
+        flash("Room name must be between 3 and 50 characters.", "error")
         return redirect(url_for("rooms.rooms_create_page"))
 
     room = create_room(owner_id=session["user_id"], name=name, with_code=with_code)
@@ -203,10 +203,9 @@ def room_session_start(room_id: int):
         flash("Room not found.", "error")
         return redirect(url_for("rooms.rooms_index"))
 
-    is_member = RoomMember.query.filter_by(room_id=room_id, user_id=session["user_id"]).first()
-    if not is_member:
-        flash("You are not a member of this room.", "error")
-        return redirect(url_for("rooms.rooms_index"))
+    if session["user_id"] != room.owner_id:
+        flash("Only the room owner can start a session.", "error")
+        return redirect(url_for("rooms.room_detail", room_id=room_id))
 
     try:
         minutes = int(request.form.get("minutes") or "25")
@@ -223,6 +222,10 @@ def room_session_start(room_id: int):
 @rooms_bp.post("/rooms/<int:room_id>/session/pause")
 @login_required
 def room_session_pause(room_id: int):
+    room = get_room(room_id)
+    if not room or session["user_id"] != room.owner_id:
+        flash("Only the room owner can control the session.", "error")
+        return redirect(url_for("rooms.room_detail", room_id=room_id))
     s = get_active_session(room_id)
     if s:
         pause_session(s)
@@ -233,6 +236,10 @@ def room_session_pause(room_id: int):
 @rooms_bp.post("/rooms/<int:room_id>/session/resume")
 @login_required
 def room_session_resume(room_id: int):
+    room = get_room(room_id)
+    if not room or session["user_id"] != room.owner_id:
+        flash("Only the room owner can control the session.", "error")
+        return redirect(url_for("rooms.room_detail", room_id=room_id))
     s = get_active_session(room_id)
     if s:
         resume_session(s)
@@ -243,6 +250,10 @@ def room_session_resume(room_id: int):
 @rooms_bp.post("/rooms/<int:room_id>/session/reset")
 @login_required
 def room_session_reset(room_id: int):
+    room = get_room(room_id)
+    if not room or session["user_id"] != room.owner_id:
+        flash("Only the room owner can control the session.", "error")
+        return redirect(url_for("rooms.room_detail", room_id=room_id))
     s = get_active_session(room_id) or get_latest_session(room_id)
     if s:
         reset_session(s, session["user_id"])
@@ -253,6 +264,10 @@ def room_session_reset(room_id: int):
 @rooms_bp.post("/rooms/<int:room_id>/session/end")
 @login_required
 def room_session_end(room_id: int):
+    room = get_room(room_id)
+    if not room or session["user_id"] != room.owner_id:
+        flash("Only the room owner can control the session.", "error")
+        return redirect(url_for("rooms.room_detail", room_id=room_id))
     s = get_active_session(room_id) or get_latest_session(room_id)
     if s:
         end_session(s, session["user_id"])

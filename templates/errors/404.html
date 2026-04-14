@@ -1,0 +1,9 @@
+{% extends "base.html" %}
+{% block title %}404 Not Found | FocusBuddy{% endblock %}
+{% block content %}
+<section class="auth-card" style="text-align:center;">
+  <h1>404</h1>
+  <p class="muted">The page you're looking for doesn't exist.</p>
+  <a class="btn primary" href="{{ url_for('main.home') }}">Go Home</a>
+</section>
+{% endblock %}

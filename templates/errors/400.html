@@ -1,0 +1,9 @@
+{% extends "base.html" %}
+{% block title %}400 Bad Request | FocusBuddy{% endblock %}
+{% block content %}
+<section class="auth-card" style="text-align:center;">
+  <h1>400</h1>
+  <p class="muted">Bad request. Please check your input and try again.</p>
+  <a class="btn primary" href="{{ url_for('main.home') }}">Go Home</a>
+</section>
+{% endblock %}

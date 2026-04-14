@@ -75,23 +75,28 @@
       <div style="font-size:2rem; font-weight:800;" id="fs-timer">25:00</div>
 
       <form method="post" action="{{ url_for('rooms.room_session_start', room_id=room.id) }}" style="margin:0; display:flex; gap:.5rem; align-items:center;">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
         <input name="minutes" type="number" min="1" max="180" value="25" style="width:90px;">
         <button class="btn primary" type="submit">Start</button>
       </form>
 
       <form method="post" action="{{ url_for('rooms.room_session_pause', room_id=room.id) }}" style="margin:0;">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
         <button class="btn secondary" type="submit">Pause</button>
       </form>
 
       <form method="post" action="{{ url_for('rooms.room_session_resume', room_id=room.id) }}" style="margin:0;">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
         <button class="btn secondary" type="submit">Resume</button>
       </form>
 
       <form method="post" action="{{ url_for('rooms.room_session_reset', room_id=room.id) }}" style="margin:0;">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
         <button class="btn secondary" type="submit">Reset</button>
       </form>
 
       <form method="post" action="{{ url_for('rooms.room_session_end', room_id=room.id) }}" style="margin:0;">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
         <button class="btn danger minimal" type="submit">End</button>
       </form>
     </div>
@@ -104,14 +109,16 @@
       <form method="post"
         action="{{ url_for('rooms.room_delete', room_id=room.id) }}"
         style="margin:0;">
-      <button class="btn danger minimal"
-          type="submit"
-          onclick="return confirm('Delete this room? This cannot be undone.');">
-        Delete
-      </button>
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <button class="btn danger minimal"
+            type="submit"
+            onclick="return confirm('Delete this room? This cannot be undone.');">
+          Delete
+        </button>
       </form>
     {% else %}
       <form method="post" action="{{ url_for('rooms.room_leave', room_id=room.id) }}" style="margin:0;">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
         <button class="btn secondary" type="submit"
                 onclick="return confirm('Leave this room?');">
           Leave Room

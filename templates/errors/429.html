@@ -1,0 +1,9 @@
+{% extends "base.html" %}
+{% block title %}429 Too Many Requests | FocusBuddy{% endblock %}
+{% block content %}
+<section class="auth-card" style="text-align:center;">
+  <h1>429</h1>
+  <p class="muted">Too many requests. Please slow down and try again in a moment.</p>
+  <a class="btn primary" href="{{ url_for('main.home') }}">Go Home</a>
+</section>
+{% endblock %}

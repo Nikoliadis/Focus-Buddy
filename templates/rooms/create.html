@@ -5,6 +5,7 @@
 <section class="auth-card">
   <h1>Create Room</h1>
   <form method="post" action="{{ url_for('rooms.rooms_create_post') }}">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
     <label for="name">Room name</label>
     <input id="name" name="name" required>
 
