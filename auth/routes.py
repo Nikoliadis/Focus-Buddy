@@ -4,7 +4,10 @@ import re
 
 from flask import render_template, request, redirect, url_for, flash, session
 
+from main.auth_utils import login_required
+from main.db import db
 from main.limiter_ext import limiter
+from models.user import User
 from . import auth_bp
 from .service import (
     find_user_by_login_identifier,
@@ -113,3 +116,62 @@ def logout():
     session.clear()
     flash("Logged out.", "info")
     return redirect(url_for("main.home"))
+
+
+@auth_bp.get("/profile")
+@login_required
+def profile_page():
+    user = db.session.get(User, session["user_id"])
+    return render_template("auth/profile.html", user=user)
+
+
+@auth_bp.post("/profile")
+@login_required
+def profile_post():
+    user = db.session.get(User, session["user_id"])
+    action = request.form.get("action")
+
+    if action == "username":
+        new_username = (request.form.get("username") or "").strip()
+        if not _USERNAME_RE.match(new_username):
+            flash("Username must be 3–30 characters: letters, numbers, underscores only.", "error")
+            return redirect(url_for("auth.profile_page"))
+        if new_username != user.username and find_user_by_username(new_username):
+            flash("Username already taken.", "error")
+            return redirect(url_for("auth.profile_page"))
+        user.username = new_username
+        session["username"] = new_username
+        db.session.commit()
+        flash("Username updated ✅", "success")
+
+    elif action == "password":
+        current = request.form.get("current_password") or ""
+        new_pw = request.form.get("new_password") or ""
+        confirm = request.form.get("confirm_password") or ""
+        if not verify_password(user, current):
+            flash("Current password is incorrect.", "error")
+            return redirect(url_for("auth.profile_page"))
+        if len(new_pw) < 8:
+            flash("New password must be at least 8 characters.", "error")
+            return redirect(url_for("auth.profile_page"))
+        if len(new_pw) > 128:
+            flash("Password is too long.", "error")
+            return redirect(url_for("auth.profile_page"))
+        if new_pw != confirm:
+            flash("Passwords do not match.", "error")
+            return redirect(url_for("auth.profile_page"))
+        from werkzeug.security import generate_password_hash
+        user.password_hash = generate_password_hash(new_pw)
+        db.session.commit()
+        flash("Password updated ✅", "success")
+
+    elif action == "goal":
+        try:
+            goal = int(request.form.get("daily_goal_minutes") or "0")
+        except ValueError:
+            goal = 0
+        user.daily_goal_minutes = goal if goal > 0 else None
+        db.session.commit()
+        flash("Daily goal updated ✅", "success")
+
+    return redirect(url_for("auth.profile_page"))

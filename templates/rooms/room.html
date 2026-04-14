@@ -2,7 +2,10 @@
 {% block title %}{{ room.name }} | FocusBuddy{% endblock %}
 
 {% block content %}
-<section class="auth-card">
+<div class="room-layout" style="display:flex; gap:1.25rem; align-items:flex-start; margin-top:2rem; margin-bottom:2rem;">
+
+<!-- ── Left: room panel ──────────────────────────────────────────────────── -->
+<section class="auth-card" style="flex:1; min-width:0; margin:0;">
   <h1 style="margin-bottom:.25rem;">
     {{ room.name }}
     {% if room.is_private %}
@@ -166,6 +169,35 @@
   </div>
 </section>
 
+<!-- ── Right: chat ───────────────────────────────────────────────────────── -->
+<div style="width:320px; flex-shrink:0; position:sticky; top:1rem;">
+  <div class="card" style="display:flex; flex-direction:column; height:calc(100vh - 5rem); max-height:700px;">
+    <h3 style="margin:0 0 .75rem; flex-shrink:0;">💬 Room Chat</h3>
+
+    <!-- Messages -->
+    <div id="chat-messages"
+         style="flex:1; overflow-y:auto; display:flex; flex-direction:column; gap:.5rem;
+                padding:.25rem 0; scroll-behavior:smooth;">
+      <p class="muted" id="chat-empty" style="text-align:center; font-size:.85rem; margin:auto;">
+        No messages yet. Say hello!
+      </p>
+    </div>
+
+    <!-- Input -->
+    <form id="chat-form" style="display:flex; gap:.5rem; margin-top:.75rem; flex-shrink:0;"
+          onsubmit="sendChat(event)">
+      <input id="chat-input" type="text" maxlength="500" placeholder="Type a message…"
+             autocomplete="off"
+             style="flex:1; padding:.6rem .8rem; border-radius:.8rem;
+                    border:1px solid var(--border); background:var(--surface);
+                    color:var(--text);">
+      <button type="submit" class="btn primary" style="padding:.6rem 1rem;">Send</button>
+    </form>
+  </div>
+</div>
+
+</div><!-- end two-column flex -->
+
 <script>
   // ── Utilities ──────────────────────────────────────────────────────────
   function fmt(seconds) {
@@ -228,6 +260,22 @@
     } catch (_) {}
   }
 
+  // ── Browser Notifications ───────────────────────────────────────────────
+  (function requestNotifPermission() {
+    if ("Notification" in window && Notification.permission === "default") {
+      Notification.requestPermission();
+    }
+  })();
+
+  function sendNotification(title, body) {
+    if (!("Notification" in window) || Notification.permission !== "granted") return;
+    if (document.visibilityState === "visible") return; // already watching
+    try {
+      const n = new Notification(title, { body, icon: "/static/favicon.ico", tag: "focusbuddy-timer" });
+      setTimeout(() => n.close(), 6000);
+    } catch (_) {}
+  }
+
   // ── Pomodoro cycle ──────────────────────────────────────────────────────
   let _sessionFocusing = false;
   let _phaseCompleted  = false;
@@ -271,6 +319,10 @@
       ? "🎉 Focus complete! Break time."
       : "💪 Break over! Time to focus.";
     showToast(msg, "success");
+    sendNotification(
+      completedPhase === "focus" ? "Focus session complete! ☕" : "Break over! Time to focus 🎯",
+      completedPhase === "focus" ? "Great work — take a break." : "Let's get back to it!"
+    );
     if (IS_OWNER) startCycleCountdown(completedPhase);
   }
 
@@ -396,6 +448,7 @@
 
   socket.on("connect", () => {
     socket.emit("room:join", { room_id: ROOM_ID });
+    socket.emit("chat:history", { room_id: ROOM_ID });
   });
 
   socket.on("timer:update", (data) => {
@@ -427,5 +480,55 @@
   window.addEventListener("beforeunload", () => {
     socket.emit("room:leave", { room_id: ROOM_ID });
   });
+
+  // ── Chat ─────────────────────────────────────────────────────────────────
+  function _appendMessage(msg) {
+    const box = document.getElementById("chat-messages");
+    const empty = document.getElementById("chat-empty");
+    if (empty) empty.remove();
+
+    const isMine = msg.user_id === CURRENT_USER_ID;
+    const wrap = document.createElement("div");
+    wrap.style.cssText = `display:flex; flex-direction:column;
+      align-items:${isMine ? "flex-end" : "flex-start"};`;
+
+    const bubble = document.createElement("div");
+    bubble.style.cssText = `
+      max-width:75%; padding:.45rem .75rem; border-radius:1rem;
+      font-size:.9rem; line-height:1.4; word-break:break-word;
+      background:${isMine ? "rgba(96,165,250,.25)" : "var(--surface2)"};
+      border:1px solid ${isMine ? "rgba(96,165,250,.3)" : "var(--border)"};`;
+
+    const meta = document.createElement("div");
+    meta.style.cssText = "font-size:.73rem; opacity:.55; margin-bottom:.2rem;";
+    meta.textContent = isMine ? `${msg.ts}` : `${msg.username} · ${msg.ts}`;
+
+    const text = document.createElement("span");
+    text.textContent = msg.body;
+
+    bubble.appendChild(text);
+    wrap.appendChild(meta);
+    wrap.appendChild(bubble);
+    box.appendChild(wrap);
+    box.scrollTop = box.scrollHeight;
+  }
+
+  socket.on("chat:history", (data) => {
+    (data.messages || []).forEach(_appendMessage);
+  });
+
+  socket.on("chat:message", (msg) => {
+    _appendMessage(msg);
+  });
+
+  function sendChat(e) {
+    e.preventDefault();
+    const input = document.getElementById("chat-input");
+    const body = (input.value || "").trim();
+    if (!body) return;
+    socket.emit("chat:message", { room_id: ROOM_ID, body });
+    input.value = "";
+    input.focus();
+  }
 </script>
 {% endblock %}

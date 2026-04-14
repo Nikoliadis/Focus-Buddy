@@ -46,6 +46,11 @@
               🏆
             </a>
           </li>
+          <li>
+            <a href="{{ url_for('auth.profile_page') }}"
+               class="{% if request.endpoint and 'profile' in request.endpoint %}active{% endif %}"
+               title="Profile">👤</a>
+          </li>
           <li class="nav-hello">Hi, {{ session.username | title }}</li>
           <li><a href="{{ url_for('auth.logout') }}">Logout</a></li>
         {% else %}
@@ -62,6 +67,12 @@
             </a>
           </li>
         {% endif %}
+
+        <li>
+          <button id="theme-toggle" onclick="toggleTheme()"
+                  style="background:none; border:none; cursor:pointer; font-size:1.1rem; opacity:.7; padding:.1rem .25rem; line-height:1;"
+                  title="Toggle light/dark" aria-label="Toggle theme">🌙</button>
+        </li>
       </ul>
     </nav>
   </header>
@@ -87,6 +98,24 @@
   </footer>
 
   <script>
+    // ── Theme ────────────────────────────────────────────────────────────────
+    (function applyStoredTheme() {
+      const theme = localStorage.getItem("fb-theme");
+      if (theme === "light") {
+        document.body.classList.add("light");
+        const btn = document.getElementById("theme-toggle");
+        if (btn) btn.textContent = "☀️";
+      }
+    })();
+
+    function toggleTheme() {
+      const isLight = document.body.classList.toggle("light");
+      localStorage.setItem("fb-theme", isLight ? "light" : "dark");
+      const btn = document.getElementById("theme-toggle");
+      if (btn) btn.textContent = isLight ? "☀️" : "🌙";
+    }
+
+    // ── Flash messages ───────────────────────────────────────────────────────
     window.addEventListener("DOMContentLoaded", () => {
 
       const flashes = document.querySelectorAll(".flash");

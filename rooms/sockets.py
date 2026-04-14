@@ -5,7 +5,9 @@ from datetime import datetime
 from flask import session
 from flask_socketio import join_room, leave_room, emit
 
+from main.db import db
 from main.socketio_ext import socketio
+from models.chat import ChatMessage
 from .models import RoomMember
 from .service import get_room
 from .presence_store import PRESENCE, LAST_SEEN, ROOM_CYCLES
@@ -247,3 +249,71 @@ def on_timer_end(data):
         end_session(s, int(user_id))
 
     emit("timer:update", {"room_id": room_id, **_session_payload(room_id)}, room=_room_key(room_id))
+
+
+# ── Chat ─────────────────────────────────────────────────────────────────────
+
+@socketio.on("chat:message")
+def on_chat_message(data):
+    room_id = int(data.get("room_id") or 0)
+    user_id = session.get("user_id")
+    body = (data.get("body") or "").strip()
+
+    if not user_id or not room_id or not body:
+        return
+    if len(body) > 500:
+        body = body[:500]
+    if not _is_member(room_id, int(user_id)):
+        return
+
+    username = session.get("username", "?")
+    msg = ChatMessage(
+        room_id=room_id,
+        user_id=int(user_id),
+        username=username,
+        body=body,
+    )
+    db.session.add(msg)
+    db.session.commit()
+
+    emit(
+        "chat:message",
+        {
+            "id": msg.id,
+            "username": username,
+            "user_id": int(user_id),
+            "body": body,
+            "ts": msg.created_at.strftime("%H:%M"),
+        },
+        room=_room_key(room_id),
+    )
+
+
+@socketio.on("chat:history")
+def on_chat_history(data):
+    room_id = int(data.get("room_id") or 0)
+    user_id = session.get("user_id")
+    if not user_id or not room_id:
+        return
+    if not _is_member(room_id, int(user_id)):
+        return
+
+    msgs = (
+        ChatMessage.query
+        .filter_by(room_id=room_id)
+        .order_by(ChatMessage.created_at.asc())
+        .limit(50)
+        .all()
+    )
+    emit("chat:history", {
+        "messages": [
+            {
+                "id": m.id,
+                "username": m.username,
+                "user_id": m.user_id,
+                "body": m.body,
+                "ts": m.created_at.strftime("%H:%M"),
+            }
+            for m in msgs
+        ]
+    })

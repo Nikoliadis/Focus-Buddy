@@ -1,0 +1,83 @@
+{% extends "base.html" %}
+{% block title %}Profile | FocusBuddy{% endblock %}
+
+{% block content %}
+<section class="hero" style="padding-bottom:1rem;">
+  <h1>Profile</h1>
+  <p class="muted">Manage your account settings.</p>
+</section>
+
+<div style="display:grid; gap:1.25rem; max-width:480px; margin:0 auto 2rem;">
+
+  <!-- Change Username -->
+  <div class="card">
+    <h3 style="margin-top:0;">Change Username</h3>
+    <form method="post" action="{{ url_for('auth.profile_post') }}">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <input type="hidden" name="action" value="username">
+      <label for="username" style="font-size:.9rem; opacity:.8;">New username</label>
+      <input id="username" name="username" value="{{ user.username }}" required
+             maxlength="30" pattern="[A-Za-z0-9_]{3,30}"
+             style="width:100%; box-sizing:border-box; margin:.4rem 0 .75rem; padding:.65rem .8rem;
+                    border-radius:.8rem; border:1px solid var(--border); background:var(--surface);
+                    color:var(--text);">
+      <button type="submit" class="btn primary">Save Username</button>
+    </form>
+  </div>
+
+  <!-- Change Password -->
+  <div class="card">
+    <h3 style="margin-top:0;">Change Password</h3>
+    <form method="post" action="{{ url_for('auth.profile_post') }}">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <input type="hidden" name="action" value="password">
+
+      <label style="font-size:.9rem; opacity:.8;">Current password</label>
+      <div class="password-wrap" style="margin:.4rem 0 .6rem;">
+        <input id="cur-pw" name="current_password" type="password" required maxlength="128"
+               style="width:100%; box-sizing:border-box; padding:.65rem 2.6rem .65rem .8rem;
+                      border-radius:.8rem; border:1px solid var(--border); background:var(--surface); color:var(--text);">
+        <button type="button" class="pw-toggle" onclick="togglePw('cur-pw',this)" aria-label="Show password">👁</button>
+      </div>
+
+      <label style="font-size:.9rem; opacity:.8;">New password</label>
+      <div class="password-wrap" style="margin:.4rem 0 .6rem;">
+        <input id="new-pw" name="new_password" type="password" required minlength="8" maxlength="128"
+               style="width:100%; box-sizing:border-box; padding:.65rem 2.6rem .65rem .8rem;
+                      border-radius:.8rem; border:1px solid var(--border); background:var(--surface); color:var(--text);">
+        <button type="button" class="pw-toggle" onclick="togglePw('new-pw',this)" aria-label="Show password">👁</button>
+      </div>
+
+      <label style="font-size:.9rem; opacity:.8;">Confirm new password</label>
+      <div class="password-wrap" style="margin:.4rem 0 .75rem;">
+        <input id="conf-pw" name="confirm_password" type="password" required maxlength="128"
+               style="width:100%; box-sizing:border-box; padding:.65rem 2.6rem .65rem .8rem;
+                      border-radius:.8rem; border:1px solid var(--border); background:var(--surface); color:var(--text);">
+        <button type="button" class="pw-toggle" onclick="togglePw('conf-pw',this)" aria-label="Show password">👁</button>
+      </div>
+
+      <button type="submit" class="btn primary">Save Password</button>
+    </form>
+  </div>
+
+  <!-- Daily Goal -->
+  <div class="card">
+    <h3 style="margin-top:0;">Daily Focus Goal</h3>
+    <p class="muted" style="margin-top:0; font-size:.9rem;">Set how many minutes you want to focus each day. Shows a progress bar on your Stats page.</p>
+    <form method="post" action="{{ url_for('auth.profile_post') }}">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <input type="hidden" name="action" value="goal">
+      <div style="display:flex; gap:.75rem; align-items:center; flex-wrap:wrap;">
+        <input name="daily_goal_minutes" type="number" min="0" max="720"
+               value="{{ user.daily_goal_minutes or '' }}"
+               placeholder="e.g. 120"
+               style="width:120px; padding:.65rem .8rem; border-radius:.8rem;
+                      border:1px solid var(--border); background:var(--surface); color:var(--text);">
+        <span class="muted" style="font-size:.9rem;">minutes / day (0 to remove)</span>
+      </div>
+      <button type="submit" class="btn primary" style="margin-top:.75rem;">Save Goal</button>
+    </form>
+  </div>
+
+</div>
+{% endblock %}

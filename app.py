@@ -22,6 +22,7 @@ import rooms.sockets
 
 from models.user import User
 from models.focus import FocusSession, FocusLog
+from models.chat import ChatMessage
 
 
 def create_app() -> Flask:

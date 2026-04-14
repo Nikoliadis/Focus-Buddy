@@ -9,6 +9,10 @@
 <section class="hero" style="padding-bottom:1rem;">
   <h1>My Stats</h1>
   <p class="muted">Your focus history at a glance.</p>
+  <a class="btn secondary" href="{{ url_for('main.stats_export') }}"
+     style="margin-top:.75rem; display:inline-block;">
+    ⬇ Export CSV
+  </a>
 </section>
 
 <!-- Summary cards -->
@@ -31,6 +35,40 @@
   <div class="card" style="text-align:center;">
     <div style="font-size:2rem; font-weight:800; color:#a78bfa;">{{ best_day_fmt }}</div>
     <div class="muted" style="margin-top:.35rem;">Best Day</div>
+  </div>
+</div>
+
+<!-- Daily Goal -->
+{% if daily_goal_minutes %}
+<div class="card" style="margin-bottom:1.5rem;">
+  <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:.6rem;">
+    <span style="font-weight:600;">Daily Goal — {{ daily_goal_minutes }}m</span>
+    <span style="font-size:.9rem; opacity:.7;">{{ today_fmt }} / {{ daily_goal_minutes }}m
+      ({{ daily_goal_pct }}%)
+    </span>
+  </div>
+  <div style="background:rgba(226,232,240,.08); border-radius:99px; height:10px; overflow:hidden;">
+    <div style="background:{% if daily_goal_pct == 100 %}#4ade80{% else %}#60a5fa{% endif %};
+                height:100%; border-radius:99px; width:{{ daily_goal_pct }}%;
+                transition: width .5s ease;"></div>
+  </div>
+  {% if daily_goal_pct == 100 %}
+    <p style="margin:.5rem 0 0; font-size:.85rem; color:#4ade80;">🎉 Goal reached today!</p>
+  {% endif %}
+</div>
+{% endif %}
+
+<!-- Streak row -->
+<div class="grid" style="margin-bottom:1.5rem; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));">
+  <div class="card" style="text-align:center;">
+    <div style="font-size:2rem; font-weight:800; color:#fb923c;">🔥 {{ current_streak }}</div>
+    <div class="muted" style="margin-top:.35rem;">Current Streak</div>
+    <div class="muted" style="font-size:.8rem; margin-top:.15rem;">day{{ 's' if current_streak != 1 }}</div>
+  </div>
+  <div class="card" style="text-align:center;">
+    <div style="font-size:2rem; font-weight:800; color:#fbbf24;">⚡ {{ longest_streak }}</div>
+    <div class="muted" style="margin-top:.35rem;">Best Streak</div>
+    <div class="muted" style="font-size:.8rem; margin-top:.15rem;">day{{ 's' if longest_streak != 1 }}</div>
   </div>
 </div>
 

@@ -11,6 +11,10 @@ from models.user import User
 from rooms.models import Room
 
 
+def get_user(user_id: int) -> User | None:
+    return db.session.get(User, user_id)
+
+
 def fmt_duration(seconds: int) -> str:
     """Convert seconds to human-readable string: 1h 25m, 45m, etc."""
     if seconds <= 0:
@@ -88,6 +92,44 @@ def get_user_stats(user_id: int) -> dict:
         chart_labels.append(d.strftime("%a"))
         chart_values.append(round(daily.get(d.strftime("%Y-%m-%d"), 0) / 60, 1))
 
+    # Streaks
+    all_day_rows = (
+        db.session.query(func.date(FocusLog.created_at).label("day"))
+        .filter(FocusLog.user_id == user_id)
+        .group_by(func.date(FocusLog.created_at))
+        .order_by(func.date(FocusLog.created_at).desc())
+        .all()
+    )
+    focus_days = sorted({str(r.day) for r in all_day_rows}, reverse=True)
+
+    current_streak = 0
+    longest_streak = 0
+    if focus_days:
+        today_str = now.strftime("%Y-%m-%d")
+        yesterday_str = (now - timedelta(days=1)).strftime("%Y-%m-%d")
+        streak = 0
+        anchor = focus_days[0]
+        if anchor in (today_str, yesterday_str):
+            expected = anchor
+            for day in focus_days:
+                if day == expected:
+                    streak += 1
+                    expected = (datetime.strptime(expected, "%Y-%m-%d") - timedelta(days=1)).strftime("%Y-%m-%d")
+                else:
+                    break
+        current_streak = streak
+
+        run = 1
+        for i in range(1, len(focus_days)):
+            prev = datetime.strptime(focus_days[i - 1], "%Y-%m-%d")
+            curr = datetime.strptime(focus_days[i], "%Y-%m-%d")
+            if (prev - curr).days == 1:
+                run += 1
+            else:
+                longest_streak = max(longest_streak, run)
+                run = 1
+        longest_streak = max(longest_streak, run)
+
     # Best single day (all time)
     best_day_row = (
         db.session.query(
@@ -110,6 +152,12 @@ def get_user_stats(user_id: int) -> dict:
         .all()
     )
 
+    user = get_user(user_id)
+    daily_goal_minutes = user.daily_goal_minutes if user else None
+    daily_goal_pct = None
+    if daily_goal_minutes:
+        daily_goal_pct = min(100, round(today_seconds / (daily_goal_minutes * 60) * 100))
+
     return {
         "total_seconds": total_seconds,
         "best_day_fmt": best_day_fmt,
@@ -123,6 +171,10 @@ def get_user_stats(user_id: int) -> dict:
         "per_room": per_room,
         "chart_labels": chart_labels,
         "chart_values": chart_values,
+        "current_streak": current_streak,
+        "longest_streak": longest_streak,
+        "daily_goal_minutes": daily_goal_minutes,
+        "daily_goal_pct": daily_goal_pct,
     }
 
 
