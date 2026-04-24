@@ -12,4 +12,9 @@ COPY . /app
 
 EXPOSE 5000
 
-CMD ["python", "app.py"]
+CMD gunicorn \
+    --worker-class geventwebsocket.gunicorn.workers.GeventWebSocketWorker \
+    --workers 1 \
+    --bind 0.0.0.0:${PORT:-5000} \
+    --timeout 120 \
+    app:app
