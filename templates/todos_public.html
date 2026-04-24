@@ -1,0 +1,37 @@
+{% extends "base.html" %}
+{% block title %}{{ owner.username | title }}'s Todos | FocusBuddy{% endblock %}
+
+{% block content %}
+<div style="max-width:600px; margin:2rem auto;">
+
+  <h1 style="margin-bottom:.4rem;">{{ owner.username | title }}'s Public Tasks</h1>
+  <p class="muted" style="margin-bottom:1.5rem;">Only public tasks are shown here.</p>
+
+  {% if items %}
+    <ul style="list-style:none; padding:0; margin:0; display:grid; gap:.6rem;">
+      {% for item in items %}
+      <li class="card" style="display:flex; align-items:center; gap:.75rem; padding:.75rem 1rem;">
+        <span style="width:1.2rem; height:1.2rem; border-radius:.3rem; border:2px solid
+                     {% if item.done %}rgba(74,222,128,.6){% else %}var(--border){% endif %};
+                     background:{% if item.done %}rgba(74,222,128,.2){% else %}transparent{% endif %};
+                     display:flex; align-items:center; justify-content:center; flex-shrink:0;">
+          {% if item.done %}<span style="color:#4ade80; font-size:.8rem;">✓</span>{% endif %}
+        </span>
+        <span style="flex:1; font-size:.95rem;
+                     {{ 'text-decoration:line-through; opacity:.5;' if item.done else '' }}">
+          {{ item.body }}
+        </span>
+      </li>
+      {% endfor %}
+    </ul>
+    <p class="muted" style="font-size:.85rem; margin-top:1rem; text-align:center;">
+      {{ items | selectattr('done') | list | length }} / {{ items | length }} completed
+    </p>
+  {% else %}
+    <div class="card" style="text-align:center; padding:2rem;">
+      <p class="muted">No public tasks yet.</p>
+    </div>
+  {% endif %}
+
+</div>
+{% endblock %}

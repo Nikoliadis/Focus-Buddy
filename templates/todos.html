@@ -1,0 +1,84 @@
+{% extends "base.html" %}
+{% block title %}My Todos | FocusBuddy{% endblock %}
+
+{% block content %}
+<div style="max-width:600px; margin:2rem auto;">
+
+  <h1 style="margin-bottom:1.5rem;">My Todo List</h1>
+
+  <!-- Add new item -->
+  <div class="card" style="margin-bottom:1.25rem;">
+    <form method="post" action="{{ url_for('main.todos_create') }}"
+          style="display:flex; flex-direction:column; gap:.75rem;">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+
+      <input type="text" name="body" maxlength="300" required
+             placeholder="Add a new task…"
+             style="padding:.65rem .85rem; border-radius:.8rem;
+                    border:1px solid var(--border); background:var(--surface);
+                    color:var(--text); font-size:.95rem;">
+
+      <div style="display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:.5rem;">
+        <label style="display:flex; align-items:center; gap:.5rem; font-size:.9rem; cursor:pointer;">
+          <input type="checkbox" name="is_public" style="width:1rem; height:1rem;">
+          Public (visible to others)
+        </label>
+        <button type="submit" class="btn primary" style="padding:.55rem 1.1rem;">Add</button>
+      </div>
+    </form>
+  </div>
+
+  <!-- Task list -->
+  {% if items %}
+    <ul style="list-style:none; padding:0; margin:0; display:grid; gap:.6rem;">
+      {% for item in items %}
+      <li class="card" style="display:flex; align-items:center; gap:.75rem; padding:.75rem 1rem;">
+
+        <!-- Toggle done -->
+        <form method="post" action="{{ url_for('main.todos_toggle', item_id=item.id) }}" style="margin:0; flex-shrink:0;">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+          <button type="submit"
+                  style="width:1.4rem; height:1.4rem; border-radius:.35rem; cursor:pointer;
+                         border:2px solid {% if item.done %}rgba(74,222,128,.6){% else %}var(--border){% endif %};
+                         background:{% if item.done %}rgba(74,222,128,.2){% else %}transparent{% endif %};
+                         display:flex; align-items:center; justify-content:center; padding:0;"
+                  title="{{ 'Mark undone' if item.done else 'Mark done' }}">
+            {% if item.done %}<span style="color:#4ade80; font-size:.85rem;">✓</span>{% endif %}
+          </button>
+        </form>
+
+        <!-- Body -->
+        <span style="flex:1; font-size:.95rem;
+                     {{ 'text-decoration:line-through; opacity:.5;' if item.done else '' }}">
+          {{ item.body }}
+        </span>
+
+        <!-- Visibility badge -->
+        {% if item.is_public %}
+          <span style="font-size:.72rem; opacity:.55; flex-shrink:0;">🌐 public</span>
+        {% else %}
+          <span style="font-size:.72rem; opacity:.4; flex-shrink:0;">🔒 private</span>
+        {% endif %}
+
+        <!-- Delete -->
+        <form method="post" action="{{ url_for('main.todos_delete', item_id=item.id) }}" style="margin:0; flex-shrink:0;">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+          <button type="submit" class="btn danger"
+                  style="padding:.2rem .55rem; font-size:.78rem;"
+                  onclick="return confirm('Delete this task?');">✕</button>
+        </form>
+      </li>
+      {% endfor %}
+    </ul>
+
+    <p class="muted" style="font-size:.85rem; margin-top:1rem; text-align:center;">
+      {{ items | selectattr('done') | list | length }} / {{ items | length }} completed
+    </p>
+  {% else %}
+    <div class="card" style="text-align:center; padding:2rem;">
+      <p class="muted">No tasks yet. Add one above!</p>
+    </div>
+  {% endif %}
+
+</div>
+{% endblock %}

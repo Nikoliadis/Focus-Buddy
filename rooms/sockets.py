@@ -8,7 +8,7 @@ from flask_socketio import join_room, leave_room, emit
 from main.db import db
 from main.socketio_ext import socketio
 from models.chat import ChatMessage
-from .models import RoomMember
+from .models import RoomMember, RoomMute
 from .service import get_room
 from .presence_store import PRESENCE, LAST_SEEN, ROOM_CYCLES
 from .sessions_service import (
@@ -266,6 +266,10 @@ def on_chat_message(data):
     if not _is_member(room_id, int(user_id)):
         return
 
+    if RoomMute.query.filter_by(room_id=room_id, user_id=int(user_id)).first():
+        emit("chat:muted_self", {"message": "You are muted in this room."})
+        return
+
     username = session.get("username", "?")
     msg = ChatMessage(
         room_id=room_id,
@@ -305,6 +309,7 @@ def on_chat_history(data):
         .limit(50)
         .all()
     )
+    muted_ids = [m.user_id for m in RoomMute.query.filter_by(room_id=room_id).all()]
     emit("chat:history", {
         "messages": [
             {
@@ -315,5 +320,69 @@ def on_chat_history(data):
                 "ts": m.created_at.strftime("%H:%M"),
             }
             for m in msgs
-        ]
+        ],
+        "muted_user_ids": muted_ids,
     })
+
+
+# ── Chat mute ─────────────────────────────────────────────────────────────────
+
+@socketio.on("chat:mute")
+def on_chat_mute(data):
+    room_id = int(data.get("room_id") or 0)
+    target_id = int(data.get("user_id") or 0)
+    user_id = session.get("user_id")
+    if not user_id or not room_id or not target_id:
+        return
+    if not _is_owner(room_id, int(user_id)):
+        emit("error", {"message": "Only the owner can mute users."})
+        return
+    if not RoomMute.query.filter_by(room_id=room_id, user_id=target_id).first():
+        db.session.add(RoomMute(room_id=room_id, user_id=target_id))
+        db.session.commit()
+    emit("chat:muted", {"room_id": room_id, "user_id": target_id}, room=_room_key(room_id))
+
+
+@socketio.on("chat:unmute")
+def on_chat_unmute(data):
+    room_id = int(data.get("room_id") or 0)
+    target_id = int(data.get("user_id") or 0)
+    user_id = session.get("user_id")
+    if not user_id or not room_id or not target_id:
+        return
+    if not _is_owner(room_id, int(user_id)):
+        emit("error", {"message": "Only the owner can unmute users."})
+        return
+    RoomMute.query.filter_by(room_id=room_id, user_id=target_id).delete()
+    db.session.commit()
+    emit("chat:unmuted", {"room_id": room_id, "user_id": target_id}, room=_room_key(room_id))
+
+
+# ── WebRTC signaling relay ────────────────────────────────────────────────────
+# The server is pure relay — no media touches the server.
+# Clients send signals addressed to a specific peer (to_user_id);
+# the server broadcasts to the room and clients ignore what isn't for them.
+
+@socketio.on("webrtc:signal")
+def on_webrtc_signal(data):
+    room_id = int(data.get("room_id") or 0)
+    user_id = session.get("user_id")
+    if not user_id or not room_id:
+        return
+    if not _is_member(room_id, int(user_id)):
+        return
+    data["from_user_id"] = int(user_id)
+    emit("webrtc:signal", data, room=_room_key(room_id))
+
+
+@socketio.on("webrtc:broadcast")
+def on_webrtc_broadcast(data):
+    room_id = int(data.get("room_id") or 0)
+    user_id = session.get("user_id")
+    if not user_id or not room_id:
+        return
+    if not _is_member(room_id, int(user_id)):
+        return
+    data["from_user_id"] = int(user_id)
+    data["username"] = session.get("username", "?")
+    emit("webrtc:broadcast", data, room=_room_key(room_id))

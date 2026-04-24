@@ -2,9 +2,41 @@
 {% block title %}{{ room.name }} | FocusBuddy{% endblock %}
 
 {% block content %}
-<div class="room-layout" style="display:flex; gap:1.25rem; align-items:flex-start; margin-top:2rem; margin-bottom:2rem;">
+<style>
+  /* Wider container for the 3-column room layout */
+  #main.container { width: min(1260px, 96%); }
+</style>
+<div class="room-layout" style="display:flex; gap:2rem; align-items:flex-start; margin-top:2rem; margin-bottom:2rem;">
 
-<!-- ── Left: room panel ──────────────────────────────────────────────────── -->
+<!-- ── Far left: My Tasks ────────────────────────────────────────────────── -->
+<div style="width:260px; flex-shrink:0; position:sticky; top:1rem;">
+  <div class="card" style="display:flex; flex-direction:column; height:calc(100vh - 5rem); max-height:700px;">
+    <h3 style="margin:0 0 .75rem; flex-shrink:0;">✅ My Tasks</h3>
+
+    <ul id="todo-list"
+        style="flex:1; overflow-y:auto; list-style:none; padding:0; margin:0; display:flex; flex-direction:column; gap:.45rem;">
+      <!-- filled by JS -->
+    </ul>
+
+    <form id="todo-form" onsubmit="todoAdd(event)"
+          style="margin-top:.75rem; flex-shrink:0; display:flex; flex-direction:column; gap:.45rem;">
+      <div style="display:flex; gap:.4rem;">
+        <input id="todo-input" type="text" maxlength="300" placeholder="Add a task…"
+               autocomplete="off"
+               style="flex:1; padding:.5rem .7rem; border-radius:.75rem;
+                      border:1px solid var(--border); background:var(--surface);
+                      color:var(--text); font-size:.85rem;">
+        <button type="submit" class="btn primary" style="padding:.5rem .85rem; font-size:.85rem;">+</button>
+      </div>
+      <label style="display:flex; align-items:center; gap:.4rem; font-size:.78rem; opacity:.6; cursor:pointer;">
+        <input type="checkbox" id="todo-public" style="width:.85rem; height:.85rem;">
+        Public
+      </label>
+    </form>
+  </div>
+</div>
+
+<!-- ── Center: room panel ────────────────────────────────────────────────── -->
 <section class="auth-card" style="flex:1; min-width:0; margin:0;">
   <h1 style="margin-bottom:.25rem;">
     {{ room.name }}
@@ -144,6 +176,9 @@
     </div>
   </div>
 
+  <!-- Screen share display area — hidden until someone shares -->
+  <div id="screen-area" style="margin-top:1rem; display:flex; flex-direction:column; gap:.75rem;"></div>
+
   <div class="actions" style="margin-top: 1.25rem; flex-wrap: wrap;">
     <a class="btn secondary" href="{{ url_for('rooms.rooms_index') }}">Back to Rooms</a>
 
@@ -174,7 +209,17 @@
 <!-- ── Right: chat ───────────────────────────────────────────────────────── -->
 <div style="width:320px; flex-shrink:0; position:sticky; top:1rem;">
   <div class="card" style="display:flex; flex-direction:column; height:calc(100vh - 5rem); max-height:700px;">
-    <h3 style="margin:0 0 .75rem; flex-shrink:0;">💬 Room Chat</h3>
+    <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:.75rem; flex-shrink:0; gap:.4rem; flex-wrap:wrap;">
+      <h3 style="margin:0;">💬 Room Chat</h3>
+      <div style="display:flex; gap:.4rem;">
+        <button id="btn-mic" class="btn secondary"
+                style="padding:.3rem .65rem; font-size:.82rem;"
+                onclick="toggleMic()" title="Toggle microphone">🎙 Mic Off</button>
+        <button id="btn-screen" class="btn secondary"
+                style="padding:.3rem .65rem; font-size:.82rem;"
+                onclick="toggleScreen()" title="Share screen">🖥 Share</button>
+      </div>
+    </div>
 
     <!-- Messages -->
     <div id="chat-messages"
@@ -185,16 +230,21 @@
       </p>
     </div>
 
-    <!-- Input -->
-    <form id="chat-form" style="display:flex; gap:.5rem; margin-top:.75rem; flex-shrink:0;"
-          onsubmit="sendChat(event)">
-      <input id="chat-input" type="text" maxlength="500" placeholder="Type a message…"
-             autocomplete="off"
-             style="flex:1; padding:.6rem .8rem; border-radius:.8rem;
-                    border:1px solid var(--border); background:var(--surface);
-                    color:var(--text);">
-      <button type="submit" class="btn primary" style="padding:.6rem 1rem;">Send</button>
-    </form>
+    <!-- Input / muted notice -->
+    <div id="chat-input-area" style="margin-top:.75rem; flex-shrink:0;">
+      <form id="chat-form" style="display:flex; gap:.5rem;" onsubmit="sendChat(event)">
+        <input id="chat-input" type="text" maxlength="500" placeholder="Type a message…"
+               autocomplete="off"
+               style="flex:1; padding:.6rem .8rem; border-radius:.8rem;
+                      border:1px solid var(--border); background:var(--surface);
+                      color:var(--text);">
+        <button type="submit" class="btn primary" style="padding:.6rem 1rem;">Send</button>
+      </form>
+      <p id="chat-muted-notice"
+         style="display:none; text-align:center; font-size:.85rem; color:#f87171; margin:.5rem 0 0;">
+        🔇 You are muted in this room.
+      </p>
+    </div>
   </div>
 </div>
 
@@ -488,6 +538,24 @@
   });
 
   // ── Chat ─────────────────────────────────────────────────────────────────
+  const _mutedUserIds = new Set();
+
+  function _setMutedState(userId, muted) {
+    if (muted) _mutedUserIds.add(userId); else _mutedUserIds.delete(userId);
+    // Update mute buttons for this user in the chat
+    document.querySelectorAll(`.mute-btn[data-uid="${userId}"]`).forEach(btn => {
+      btn.textContent = muted ? "Unmute" : "Mute";
+      btn.dataset.muted = muted ? "1" : "0";
+    });
+    // Show notice if current user is muted
+    if (userId === CURRENT_USER_ID) {
+      const form = document.getElementById("chat-form");
+      const notice = document.getElementById("chat-muted-notice");
+      if (form) form.style.display = muted ? "none" : "flex";
+      if (notice) notice.style.display = muted ? "block" : "none";
+    }
+  }
+
   function _appendMessage(msg) {
     const box = document.getElementById("chat-messages");
     const empty = document.getElementById("chat-empty");
@@ -506,8 +574,27 @@
       border:1px solid ${isMine ? "rgba(96,165,250,.3)" : "var(--border)"};`;
 
     const meta = document.createElement("div");
-    meta.style.cssText = "font-size:.73rem; opacity:.55; margin-bottom:.2rem;";
-    meta.textContent = isMine ? `${msg.ts}` : `${msg.username} · ${msg.ts}`;
+    meta.style.cssText = "font-size:.73rem; opacity:.55; margin-bottom:.2rem; display:flex; align-items:center; gap:.4rem;";
+
+    const metaText = document.createElement("span");
+    metaText.textContent = isMine ? `${msg.ts}` : `${msg.username} · ${msg.ts}`;
+    meta.appendChild(metaText);
+
+    // Owner gets a mute/unmute button on others' messages
+    if (IS_OWNER && !isMine) {
+      const isMuted = _mutedUserIds.has(msg.user_id);
+      const muteBtn = document.createElement("button");
+      muteBtn.className = "mute-btn";
+      muteBtn.dataset.uid = msg.user_id;
+      muteBtn.dataset.muted = isMuted ? "1" : "0";
+      muteBtn.textContent = isMuted ? "Unmute" : "Mute";
+      muteBtn.style.cssText = "background:none; border:none; cursor:pointer; font-size:.7rem; opacity:.6; padding:.1rem .3rem; line-height:1; text-decoration:underline; color:inherit;";
+      muteBtn.addEventListener("click", () => {
+        const muted = muteBtn.dataset.muted === "1";
+        socket.emit(muted ? "chat:unmute" : "chat:mute", { room_id: ROOM_ID, user_id: msg.user_id });
+      });
+      meta.appendChild(muteBtn);
+    }
 
     const text = document.createElement("span");
     text.textContent = msg.body;
@@ -520,11 +607,30 @@
   }
 
   socket.on("chat:history", (data) => {
+    (data.muted_user_ids || []).forEach(uid => _mutedUserIds.add(uid));
+    // Apply muted state for current user immediately
+    if (_mutedUserIds.has(CURRENT_USER_ID)) _setMutedState(CURRENT_USER_ID, true);
     (data.messages || []).forEach(_appendMessage);
   });
 
   socket.on("chat:message", (msg) => {
     _appendMessage(msg);
+  });
+
+  socket.on("chat:muted", (data) => {
+    if (data.room_id !== ROOM_ID) return;
+    _setMutedState(data.user_id, true);
+    if (data.user_id === CURRENT_USER_ID) showToast("You have been muted.", "error");
+  });
+
+  socket.on("chat:unmuted", (data) => {
+    if (data.room_id !== ROOM_ID) return;
+    _setMutedState(data.user_id, false);
+    if (data.user_id === CURRENT_USER_ID) showToast("You have been unmuted.", "success");
+  });
+
+  socket.on("chat:muted_self", () => {
+    showToast("You are muted in this room.", "error");
   });
 
   function sendChat(e) {
@@ -536,5 +642,280 @@
     input.value = "";
     input.focus();
   }
+
+  // ── WebRTC ──────────────────────────────────────────────────────────────
+  const STUN_CONFIG = { iceServers: [
+    { urls: "stun:stun.l.google.com:19302" },
+    { urls: "stun:stun1.l.google.com:19302" },
+  ]};
+  const _peers = {};        // user_id -> RTCPeerConnection
+  const _localStreams = { screen: null, mic: null };
+  let _sharingScreen = false;
+  let _micEnabled = false;
+
+  function _getMemberIds() {
+    return [...document.querySelectorAll("[data-user-id]")]
+      .map(el => parseInt(el.dataset.userId, 10))
+      .filter(id => id !== CURRENT_USER_ID);
+  }
+
+  function _getOrCreatePeer(userId) {
+    if (_peers[userId]) return _peers[userId];
+    const pc = new RTCPeerConnection(STUN_CONFIG);
+    _peers[userId] = pc;
+
+    pc.onicecandidate = (e) => {
+      if (e.candidate) {
+        socket.emit("webrtc:signal", { room_id: ROOM_ID, to_user_id: userId, type: "ice", data: e.candidate });
+      }
+    };
+
+    pc.ontrack = (e) => _handleRemoteTrack(userId, e.streams[0], e.track);
+    return pc;
+  }
+
+  function _handleRemoteTrack(userId, stream, track) {
+    const area = document.getElementById("screen-area");
+    if (track.kind === "video") {
+      let vid = document.getElementById(`screen-${userId}`);
+      if (!vid) {
+        const wrapper = document.createElement("div");
+        wrapper.id = `screen-wrapper-${userId}`;
+        wrapper.style.cssText = "position:relative;";
+        vid = document.createElement("video");
+        vid.id = `screen-${userId}`;
+        vid.autoplay = true;
+        vid.style.cssText = "width:100%; border-radius:.75rem; border:1px solid var(--border); display:block;";
+        wrapper.appendChild(vid);
+        area.appendChild(wrapper);
+      }
+      vid.srcObject = stream;
+    } else if (track.kind === "audio") {
+      let aud = document.getElementById(`audio-${userId}`);
+      if (!aud) {
+        aud = document.createElement("audio");
+        aud.id = `audio-${userId}`;
+        aud.autoplay = true;
+        document.body.appendChild(aud);
+      }
+      aud.srcObject = stream;
+    }
+  }
+
+  async function _addTracksAndOffer(pc, userId) {
+    if (_localStreams.screen) {
+      _localStreams.screen.getTracks().forEach(t => {
+        if (!pc.getSenders().find(s => s.track === t)) pc.addTrack(t, _localStreams.screen);
+      });
+    }
+    if (_localStreams.mic) {
+      _localStreams.mic.getTracks().forEach(t => {
+        if (!pc.getSenders().find(s => s.track === t)) pc.addTrack(t, _localStreams.mic);
+      });
+    }
+    const offer = await pc.createOffer();
+    await pc.setLocalDescription(offer);
+    socket.emit("webrtc:signal", { room_id: ROOM_ID, to_user_id: userId, type: "offer", data: offer });
+  }
+
+  async function toggleScreen() {
+    if (_sharingScreen) {
+      _stopScreen();
+    } else {
+      try {
+        _localStreams.screen = await navigator.mediaDevices.getDisplayMedia({ video: true, audio: false });
+        _sharingScreen = true;
+        document.getElementById("btn-screen").textContent = "🖥 Stop";
+        socket.emit("webrtc:broadcast", { room_id: ROOM_ID, type: "screen_start" });
+        for (const uid of _getMemberIds()) await _addTracksAndOffer(_getOrCreatePeer(uid), uid);
+        _localStreams.screen.getVideoTracks()[0].onended = () => _stopScreen();
+      } catch (e) {
+        if (e.name !== "NotAllowedError") showToast("Could not share screen.", "error");
+      }
+    }
+  }
+
+  function _stopScreen() {
+    if (_localStreams.screen) { _localStreams.screen.getTracks().forEach(t => t.stop()); _localStreams.screen = null; }
+    _sharingScreen = false;
+    document.getElementById("btn-screen").textContent = "🖥 Share";
+    socket.emit("webrtc:broadcast", { room_id: ROOM_ID, type: "screen_stop" });
+    // Remove own screen preview elements handled by remote track on their side
+  }
+
+  async function toggleMic() {
+    if (_micEnabled) {
+      if (_localStreams.mic) { _localStreams.mic.getTracks().forEach(t => t.stop()); _localStreams.mic = null; }
+      _micEnabled = false;
+      document.getElementById("btn-mic").textContent = "🎙 Mic Off";
+      socket.emit("webrtc:broadcast", { room_id: ROOM_ID, type: "mic_stop" });
+      // Remove audio senders from existing connections
+      Object.values(_peers).forEach(pc => {
+        pc.getSenders().filter(s => s.track && s.track.kind === "audio").forEach(s => pc.removeTrack(s));
+      });
+    } else {
+      try {
+        _localStreams.mic = await navigator.mediaDevices.getUserMedia({ audio: true });
+        _micEnabled = true;
+        document.getElementById("btn-mic").textContent = "🎙 Mic On";
+        socket.emit("webrtc:broadcast", { room_id: ROOM_ID, type: "mic_start" });
+        for (const uid of _getMemberIds()) await _addTracksAndOffer(_getOrCreatePeer(uid), uid);
+      } catch (e) {
+        showToast("Could not access microphone.", "error");
+      }
+    }
+  }
+
+  socket.on("webrtc:signal", async (data) => {
+    if (data.to_user_id && data.to_user_id !== CURRENT_USER_ID) return;
+    const fromId = data.from_user_id;
+    const pc = _getOrCreatePeer(fromId);
+    try {
+      if (data.type === "offer") {
+        await pc.setRemoteDescription(new RTCSessionDescription(data.data));
+        const answer = await pc.createAnswer();
+        await pc.setLocalDescription(answer);
+        socket.emit("webrtc:signal", { room_id: ROOM_ID, to_user_id: fromId, type: "answer", data: answer });
+      } else if (data.type === "answer") {
+        await pc.setRemoteDescription(new RTCSessionDescription(data.data));
+      } else if (data.type === "ice") {
+        await pc.addIceCandidate(new RTCIceCandidate(data.data));
+      }
+    } catch (_) {}
+  });
+
+  socket.on("webrtc:broadcast", (data) => {
+    if (data.room_id !== ROOM_ID || data.from_user_id === CURRENT_USER_ID) return;
+    const uid = data.from_user_id;
+    const name = data.username || "Someone";
+    if (data.type === "screen_start") showToast(`${name} is sharing their screen.`, "info");
+    else if (data.type === "screen_stop") {
+      showToast(`${name} stopped sharing.`, "info");
+      const el = document.getElementById(`screen-wrapper-${uid}`);
+      if (el) el.remove();
+      const aud = document.getElementById(`audio-${uid}`);
+      if (aud) aud.remove();
+      if (_peers[uid]) { _peers[uid].close(); delete _peers[uid]; }
+    } else if (data.type === "mic_start") showToast(`${name} joined voice.`, "info");
+    else if (data.type === "mic_stop") {
+      const aud = document.getElementById(`audio-${uid}`);
+      if (aud) aud.remove();
+    }
+  });
+
+  // ── My Tasks widget ────────────────────────────────────────────────────────
+  const CSRF = "{{ csrf_token() }}";
+
+  function _todoRender(item) {
+    const li = document.createElement("li");
+    li.id = `todo-${item.id}`;
+    li.style.cssText = "display:flex; align-items:center; gap:.5rem;";
+
+    const cb = document.createElement("button");
+    cb.style.cssText = `width:1.2rem; height:1.2rem; border-radius:.3rem; cursor:pointer; flex-shrink:0;
+      border:2px solid ${item.done ? "rgba(74,222,128,.6)" : "var(--border)"};
+      background:${item.done ? "rgba(74,222,128,.2)" : "transparent"};
+      display:flex; align-items:center; justify-content:center; padding:0;`;
+    cb.innerHTML = item.done ? '<span style="color:#4ade80;font-size:.75rem;">✓</span>' : "";
+    cb.title = item.done ? "Mark undone" : "Mark done";
+    cb.onclick = () => todoToggle(item.id);
+
+    const label = document.createElement("span");
+    label.style.cssText = `flex:1; font-size:.88rem; ${item.done ? "text-decoration:line-through; opacity:.45;" : ""}`;
+    label.textContent = item.body;
+
+    const del = document.createElement("button");
+    del.style.cssText = "background:none; border:none; cursor:pointer; opacity:.4; font-size:.8rem; padding:.1rem .3rem; flex-shrink:0;";
+    del.textContent = "✕";
+    del.title = "Delete";
+    del.onclick = () => todoDelete(item.id);
+
+    li.appendChild(cb);
+    li.appendChild(label);
+    li.appendChild(del);
+    return li;
+  }
+
+  async function todoLoad() {
+    try {
+      const res = await fetch("/api/todos", { cache: "no-store" });
+      if (!res.ok) return;
+      const items = await res.json();
+      const list = document.getElementById("todo-list");
+      list.innerHTML = "";
+      if (!items.length) {
+        list.innerHTML = '<li style="font-size:.82rem; opacity:.45; text-align:center; padding:.25rem 0;">No tasks yet.</li>';
+        return;
+      }
+      items.forEach(item => list.appendChild(_todoRender(item)));
+    } catch (_) {}
+  }
+
+  async function todoAdd(e) {
+    e.preventDefault();
+    const input = document.getElementById("todo-input");
+    const body = (input.value || "").trim();
+    if (!body) return;
+    const isPublic = document.getElementById("todo-public").checked;
+    try {
+      const res = await fetch("/api/todos", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "X-CSRF-Token": CSRF },
+        body: JSON.stringify({ body, is_public: isPublic }),
+      });
+      if (!res.ok) return;
+      const item = await res.json();
+      const list = document.getElementById("todo-list");
+      const empty = list.querySelector("li[style*='No tasks']");
+      if (empty) empty.remove();
+      list.appendChild(_todoRender(item));
+      input.value = "";
+      input.focus();
+    } catch (_) {}
+  }
+
+  async function todoToggle(id) {
+    try {
+      const res = await fetch(`/api/todos/${id}/toggle`, {
+        method: "POST",
+        headers: { "X-CSRF-Token": CSRF },
+      });
+      if (!res.ok) return;
+      const data = await res.json();
+      const li = document.getElementById(`todo-${id}`);
+      if (!li) return;
+      const cb = li.querySelector("button");
+      const label = li.querySelector("span");
+      if (data.done) {
+        cb.style.borderColor = "rgba(74,222,128,.6)";
+        cb.style.background = "rgba(74,222,128,.2)";
+        cb.innerHTML = '<span style="color:#4ade80;font-size:.75rem;">✓</span>';
+        if (label) label.style.cssText = "flex:1; font-size:.88rem; text-decoration:line-through; opacity:.45;";
+      } else {
+        cb.style.borderColor = "var(--border)";
+        cb.style.background = "transparent";
+        cb.innerHTML = "";
+        if (label) label.style.cssText = "flex:1; font-size:.88rem;";
+      }
+    } catch (_) {}
+  }
+
+  async function todoDelete(id) {
+    try {
+      const res = await fetch(`/api/todos/${id}/delete`, {
+        method: "POST",
+        headers: { "X-CSRF-Token": CSRF },
+      });
+      if (!res.ok) return;
+      const li = document.getElementById(`todo-${id}`);
+      if (li) li.remove();
+      const list = document.getElementById("todo-list");
+      if (!list.children.length) {
+        list.innerHTML = '<li style="font-size:.82rem; opacity:.45; text-align:center; padding:.25rem 0;">No tasks yet.</li>';
+      }
+    } catch (_) {}
+  }
+
+  todoLoad();
 </script>
 {% endblock %}
