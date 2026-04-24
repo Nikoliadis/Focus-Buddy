@@ -479,8 +479,12 @@
     console.warn("socket error:", data);
   });
 
-  window.addEventListener("beforeunload", () => {
+  window.addEventListener("beforeunload", (e) => {
     socket.emit("room:leave", { room_id: ROOM_ID });
+    if (_sessionFocusing) {
+      e.preventDefault();
+      e.returnValue = ""; // triggers native browser "Leave site?" dialog
+    }
   });
 
   // ── Chat ─────────────────────────────────────────────────────────────────
