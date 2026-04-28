@@ -15,20 +15,20 @@
     <label for="password">Password</label>
     <div class="password-wrap">
       <input id="password" name="password" type="password" autocomplete="current-password" required>
-      <button type="button" class="pw-toggle" onclick="togglePw('password', this)" aria-label="Show password">👁</button>
+      <button type="button" class="pw-toggle" onclick="togglePw('password', this)" aria-label="Show password">&#128065;</button>
     </div>
 
     <button class="btn primary" type="submit">Sign in</button>
   </form>
 
   <p class="muted" style="margin-top:1rem;">
-    <a href="{{ url_for(‘auth.forgot_password_page’) }}">Forgot password?</a>
+    <a href="{{ url_for('auth.forgot_password_page') }}">Forgot password?</a>
   </p>
   <p class="muted" style="margin-top:.5rem;">
-    Don’t have an account? <a href="{{ url_for(‘auth.register_page’) }}">Register</a>
+    Don't have an account? <a href="{{ url_for('auth.register_page') }}">Register</a>
   </p>
   <p class="muted" style="margin-top:.5rem;">
-    Didn’t get verification email? <a href="{{ url_for(‘auth.resend_verification_page’) }}">Resend it</a>
+    Didn't get verification email? <a href="{{ url_for('auth.resend_verification_page') }}">Resend it</a>
   </p>
 </section>
 {% endblock %}
