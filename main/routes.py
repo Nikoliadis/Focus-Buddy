@@ -1,15 +1,23 @@
 import csv
 import io
+import os
 
 from flask import render_template, session, Response, request, redirect, url_for, jsonify
 
 from main.auth_utils import login_required
 from main.db import db
+from main.limiter_ext import limiter
 from main.stats_service import get_user_stats, get_leaderboard
 from models.focus import FocusLog
 from models.todo import TodoItem
 from rooms.models import Room
 from . import main_bp
+
+_AI_SYSTEM = (
+    "You are FocusBot, a friendly study assistant inside FocusBuddy — a real-time focus and study app. "
+    "Help users with study questions, productivity tips, exam prep, and anything related to learning. "
+    "Be concise, encouraging, and use simple language. Keep responses under 200 words unless more detail is needed."
+)
 
 
 @main_bp.get("/")
@@ -110,3 +118,42 @@ def api_todos_delete(item_id: int):
     db.session.delete(item)
     db.session.commit()
     return jsonify({"ok": True})
+
+
+# ── AI Chat ───────────────────────────────────────────────────────────────────
+
+@main_bp.post("/api/ai/chat")
+@login_required
+@limiter.limit("20 per minute")
+def api_ai_chat():
+    api_key = os.getenv("GROQ_API_KEY", "")
+    if not api_key:
+        return jsonify({"error": "AI not configured"}), 503
+
+    data = request.get_json(silent=True) or {}
+    message = (data.get("message") or "").strip()
+    if not message or len(message) > 1000:
+        return jsonify({"error": "Invalid message"}), 400
+
+    history = data.get("history") or []
+    # Keep last 10 exchanges to limit token usage
+    history = history[-10:]
+    messages = [
+        {"role": m["role"], "content": m["content"]}
+        for m in history
+        if m.get("role") in ("user", "assistant") and m.get("content")
+    ]
+    messages.append({"role": "user", "content": message})
+
+    try:
+        from groq import Groq
+        client = Groq(api_key=api_key)
+        response = client.chat.completions.create(
+            model="llama-3.1-8b-instant",
+            max_tokens=512,
+            messages=[{"role": "system", "content": _AI_SYSTEM}] + messages,
+        )
+        reply = response.choices[0].message.content
+        return jsonify({"reply": reply})
+    except Exception as e:
+        return jsonify({"error": "AI error", "detail": str(e)}), 500

@@ -211,11 +211,24 @@
   </div>
 </section>
 
-<!-- ── Right: chat ───────────────────────────────────────────────────────── -->
+<!-- ── Right: chat + AI ──────────────────────────────────────────────────── -->
 <div style="width:320px; flex-shrink:0; position:sticky; top:1rem;">
   <div class="card" style="display:flex; flex-direction:column; height:calc(100vh - 5rem); max-height:700px;">
-    <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:.75rem; flex-shrink:0; gap:.4rem; flex-wrap:wrap;">
-      <h3 style="margin:0;">💬 Room Chat</h3>
+
+    <!-- Tab bar -->
+    <div style="display:flex; gap:.4rem; margin-bottom:.75rem; flex-shrink:0; flex-wrap:wrap; align-items:center;">
+      <div style="display:flex; gap:.3rem; flex:1;">
+        <button id="tab-chat" onclick="switchTab('chat')"
+                style="flex:1; padding:.35rem .6rem; border-radius:.65rem; font-size:.82rem; font-weight:600;
+                       border:1px solid rgba(56,189,248,.4); background:rgba(56,189,248,.15); cursor:pointer; color:var(--text);">
+          💬 Chat
+        </button>
+        <button id="tab-ai" onclick="switchTab('ai')"
+                style="flex:1; padding:.35rem .6rem; border-radius:.65rem; font-size:.82rem; font-weight:600;
+                       border:1px solid var(--border); background:transparent; cursor:pointer; color:var(--text); opacity:.6;">
+          🤖 AI
+        </button>
+      </div>
       <div style="display:flex; gap:.4rem;">
         <button id="btn-mic" class="btn secondary"
                 style="padding:.3rem .65rem; font-size:.82rem;"
@@ -226,30 +239,51 @@
       </div>
     </div>
 
-    <!-- Messages -->
-    <div id="chat-messages"
-         style="flex:1; overflow-y:auto; display:flex; flex-direction:column; gap:.5rem;
-                padding:.25rem 0; scroll-behavior:smooth;">
-      <p class="muted" id="chat-empty" style="text-align:center; font-size:.85rem; margin:auto;">
-        No messages yet. Say hello!
-      </p>
+    <!-- ── Room Chat panel ── -->
+    <div id="panel-chat" style="flex:1; min-height:0; display:flex; flex-direction:column;">
+      <div id="chat-messages"
+           style="flex:1; overflow-y:auto; display:flex; flex-direction:column; gap:.5rem;
+                  padding:.25rem 0; scroll-behavior:smooth;">
+        <p class="muted" id="chat-empty" style="text-align:center; font-size:.85rem; margin:auto;">
+          No messages yet. Say hello!
+        </p>
+      </div>
+      <div id="chat-input-area" style="margin-top:.75rem; flex-shrink:0;">
+        <form id="chat-form" style="display:flex; gap:.5rem;" onsubmit="sendChat(event)">
+          <input id="chat-input" type="text" maxlength="500" placeholder="Type a message…"
+                 autocomplete="off"
+                 style="flex:1; padding:.6rem .8rem; border-radius:.8rem;
+                        border:1px solid var(--border); background:var(--surface); color:var(--text);">
+          <button type="submit" class="btn primary" style="padding:.6rem 1rem;">Send</button>
+        </form>
+        <p id="chat-muted-notice"
+           style="display:none; text-align:center; font-size:.85rem; color:#f87171; margin:.5rem 0 0;">
+          🔇 You are muted in this room.
+        </p>
+      </div>
     </div>
 
-    <!-- Input / muted notice -->
-    <div id="chat-input-area" style="margin-top:.75rem; flex-shrink:0;">
-      <form id="chat-form" style="display:flex; gap:.5rem;" onsubmit="sendChat(event)">
-        <input id="chat-input" type="text" maxlength="500" placeholder="Type a message…"
-               autocomplete="off"
-               style="flex:1; padding:.6rem .8rem; border-radius:.8rem;
-                      border:1px solid var(--border); background:var(--surface);
-                      color:var(--text);">
-        <button type="submit" class="btn primary" style="padding:.6rem 1rem;">Send</button>
-      </form>
-      <p id="chat-muted-notice"
-         style="display:none; text-align:center; font-size:.85rem; color:#f87171; margin:.5rem 0 0;">
-        🔇 You are muted in this room.
-      </p>
+    <!-- ── AI Chat panel ── -->
+    <div id="panel-ai" style="flex:1; min-height:0; display:none; flex-direction:column;">
+      <div id="ai-messages"
+           style="flex:1; overflow-y:auto; display:flex; flex-direction:column; gap:.6rem;
+                  padding:.25rem 0; scroll-behavior:smooth;">
+        <div style="text-align:center; margin:auto; opacity:.55; font-size:.85rem; padding:1rem;">
+          <div style="font-size:1.8rem; margin-bottom:.4rem;">🤖</div>
+          Hi! I'm FocusBot. Ask me anything about studying, productivity, or your subjects!
+        </div>
+      </div>
+      <div style="margin-top:.75rem; flex-shrink:0;">
+        <form id="ai-form" style="display:flex; gap:.5rem;" onsubmit="sendAI(event)">
+          <input id="ai-input" type="text" maxlength="1000" placeholder="Ask FocusBot…"
+                 autocomplete="off"
+                 style="flex:1; padding:.6rem .8rem; border-radius:.8rem;
+                        border:1px solid var(--border); background:var(--surface); color:var(--text);">
+          <button type="submit" id="ai-send-btn" class="btn primary" style="padding:.6rem 1rem;">Ask</button>
+        </form>
+      </div>
     </div>
+
   </div>
 </div>
 
@@ -839,6 +873,78 @@
     li.appendChild(label);
     li.appendChild(del);
     return li;
+  }
+
+  // ── Tab switching ────────────────────────────────────────────────────────
+  function switchTab(tab) {
+    const isChat = tab === 'chat';
+    document.getElementById('panel-chat').style.display = isChat ? 'flex' : 'none';
+    document.getElementById('panel-ai').style.display  = isChat ? 'none' : 'flex';
+
+    const tabChat = document.getElementById('tab-chat');
+    const tabAI   = document.getElementById('tab-ai');
+    tabChat.style.background    = isChat ? 'rgba(56,189,248,.15)' : 'transparent';
+    tabChat.style.borderColor   = isChat ? 'rgba(56,189,248,.4)' : 'var(--border)';
+    tabChat.style.opacity       = isChat ? '1' : '.6';
+    tabAI.style.background      = isChat ? 'transparent' : 'rgba(56,189,248,.15)';
+    tabAI.style.borderColor     = isChat ? 'var(--border)' : 'rgba(56,189,248,.4)';
+    tabAI.style.opacity         = isChat ? '.6' : '1';
+  }
+
+  // ── AI Chat ──────────────────────────────────────────────────────────────
+  const _aiHistory = [];
+
+  function _aiAppend(role, text) {
+    const box = document.getElementById('ai-messages');
+    const isUser = role === 'user';
+    const wrap = document.createElement('div');
+    wrap.style.cssText = `display:flex; justify-content:${isUser ? 'flex-end' : 'flex-start'};`;
+    const bubble = document.createElement('div');
+    bubble.style.cssText = `
+      max-width:82%; padding:.55rem .8rem; border-radius:1rem; font-size:.85rem; line-height:1.45;
+      background:${isUser ? 'rgba(56,189,248,.2)' : 'var(--surface2)'};
+      border:1px solid ${isUser ? 'rgba(56,189,248,.3)' : 'var(--border)'};
+      white-space:pre-wrap; word-break:break-word;
+    `;
+    bubble.textContent = text;
+    wrap.appendChild(bubble);
+    box.appendChild(wrap);
+    box.scrollTop = box.scrollHeight;
+  }
+
+  async function sendAI(e) {
+    e.preventDefault();
+    const input = document.getElementById('ai-input');
+    const msg = input.value.trim();
+    if (!msg) return;
+
+    input.value = '';
+    _aiAppend('user', msg);
+    _aiHistory.push({ role: 'user', content: msg });
+
+    const btn = document.getElementById('ai-send-btn');
+    btn.disabled = true;
+    btn.textContent = '…';
+
+    try {
+      const res = await fetch('/api/ai/chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ message: msg, history: _aiHistory.slice(0, -1) }),
+      });
+      const data = await res.json();
+      if (data.reply) {
+        _aiAppend('assistant', data.reply);
+        _aiHistory.push({ role: 'assistant', content: data.reply });
+      } else {
+        _aiAppend('assistant', '⚠️ Sorry, something went wrong. Try again.');
+      }
+    } catch (_) {
+      _aiAppend('assistant', '⚠️ Could not reach FocusBot. Check your connection.');
+    } finally {
+      btn.disabled = false;
+      btn.textContent = 'Ask';
+    }
   }
 
   function todoTogglePanel(btn) {
