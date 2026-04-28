@@ -13,3 +13,4 @@ gevent==24.10.1
 gevent-websocket==0.10.1
 
 Flask-Limiter==3.5.0
+resend==2.10.0

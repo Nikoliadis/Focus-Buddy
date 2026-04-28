@@ -3,11 +3,14 @@ from __future__ import annotations
 import re
 
 from flask import render_template, request, redirect, url_for, flash, session
+from werkzeug.security import generate_password_hash
 
 from main.auth_utils import login_required
 from main.db import db
 from main.limiter_ext import limiter
+from main.email_utils import send_verification_email, send_password_reset_email
 from models.user import User
+from models.tokens import EmailVerificationToken, PasswordResetToken
 from . import auth_bp
 from .service import (
     find_user_by_login_identifier,
@@ -46,6 +49,10 @@ def login_post():
     user = find_user_by_login_identifier(identifier)
     if not user or not verify_password(user, password):
         flash("Invalid credentials.", "error")
+        return redirect(url_for("auth.login_page", next=next_url))
+
+    if not user.email_verified:
+        flash("Please verify your email before logging in. Check your inbox or request a new link.", "error")
         return redirect(url_for("auth.login_page", next=next_url))
 
     session.permanent = True
@@ -103,12 +110,122 @@ def register_post():
 
     user = create_user(username, email, password)
 
-    session.permanent = True
-    session["user_id"] = user.id
-    session["username"] = user.username
+    tok = EmailVerificationToken.generate(user.id)
+    db.session.commit()
 
-    flash("Account created ✅", "success")
-    return redirect(url_for("main.home"))
+    try:
+        verify_url = url_for("auth.verify_email", token=tok.token, _external=True)
+        send_verification_email(user.email, user.username, verify_url)
+    except Exception:
+        pass
+
+    return render_template("auth/verify_pending.html", email=email)
+
+
+@auth_bp.get("/verify-email/<token>")
+def verify_email(token: str):
+    tok = EmailVerificationToken.query.filter_by(token=token).first()
+    if not tok or not tok.is_valid():
+        flash("This verification link is invalid or has expired.", "error")
+        return redirect(url_for("auth.login_page"))
+
+    tok.used = True
+    user = db.session.get(User, tok.user_id)
+    user.email_verified = True
+    db.session.commit()
+
+    flash("Email verified ✅ You can now log in.", "success")
+    return redirect(url_for("auth.login_page"))
+
+
+@auth_bp.get("/resend-verification")
+def resend_verification_page():
+    return render_template("auth/resend_verification.html")
+
+
+@auth_bp.post("/resend-verification")
+@limiter.limit("3 per minute")
+def resend_verification_post():
+    email = (request.form.get("email") or "").strip().lower()
+    user = find_user_by_email(email)
+
+    # Always show success to avoid email enumeration
+    if user and not user.email_verified:
+        tok = EmailVerificationToken.generate(user.id)
+        db.session.commit()
+        try:
+            verify_url = url_for("auth.verify_email", token=tok.token, _external=True)
+            send_verification_email(user.email, user.username, verify_url)
+        except Exception:
+            pass
+
+    flash("If that email is registered and unverified, a new link has been sent.", "info")
+    return redirect(url_for("auth.login_page"))
+
+
+@auth_bp.get("/forgot-password")
+def forgot_password_page():
+    return render_template("auth/forgot_password.html")
+
+
+@auth_bp.post("/forgot-password")
+@limiter.limit("5 per minute")
+def forgot_password_post():
+    email = (request.form.get("email") or "").strip().lower()
+    user = find_user_by_email(email)
+
+    if user:
+        tok = PasswordResetToken.generate(user.id)
+        db.session.commit()
+        try:
+            reset_url = url_for("auth.reset_password_page", token=tok.token, _external=True)
+            send_password_reset_email(user.email, user.username, reset_url)
+        except Exception:
+            pass
+
+    flash("If that email is registered, a password reset link has been sent.", "info")
+    return redirect(url_for("auth.login_page"))
+
+
+@auth_bp.get("/reset-password/<token>")
+def reset_password_page(token: str):
+    tok = PasswordResetToken.query.filter_by(token=token).first()
+    if not tok or not tok.is_valid():
+        flash("This reset link is invalid or has expired.", "error")
+        return redirect(url_for("auth.forgot_password_page"))
+    return render_template("auth/reset_password.html", token=token)
+
+
+@auth_bp.post("/reset-password/<token>")
+@limiter.limit("5 per minute")
+def reset_password_post(token: str):
+    tok = PasswordResetToken.query.filter_by(token=token).first()
+    if not tok or not tok.is_valid():
+        flash("This reset link is invalid or has expired.", "error")
+        return redirect(url_for("auth.forgot_password_page"))
+
+    new_pw = request.form.get("password") or ""
+    confirm = request.form.get("confirm") or ""
+
+    if len(new_pw) < 8:
+        flash("Password must be at least 8 characters.", "error")
+        return redirect(url_for("auth.reset_password_page", token=token))
+
+    if len(new_pw) > 128:
+        flash("Password is too long.", "error")
+        return redirect(url_for("auth.reset_password_page", token=token))
+
+    if new_pw != confirm:
+        flash("Passwords do not match.", "error")
+        return redirect(url_for("auth.reset_password_page", token=token))
+
+    tok.used = True
+    user = db.session.get(User, tok.user_id)
+    user.password_hash = generate_password_hash(new_pw)
+    db.session.commit()
+
+    flash("Password updated ✅ You can now log in.", "success")
+    return redirect(url_for("auth.login_page"))
 
 
 @auth_bp.get("/logout")
@@ -160,7 +277,6 @@ def profile_post():
         if new_pw != confirm:
             flash("Passwords do not match.", "error")
             return redirect(url_for("auth.profile_page"))
-        from werkzeug.security import generate_password_hash
         user.password_hash = generate_password_hash(new_pw)
         db.session.commit()
         flash("Password updated ✅", "success")

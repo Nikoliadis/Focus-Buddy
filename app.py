@@ -24,6 +24,7 @@ from models.user import User
 from models.focus import FocusSession, FocusLog
 from models.chat import ChatMessage
 from models.todo import TodoItem
+from models.tokens import EmailVerificationToken, PasswordResetToken
 
 
 def create_app() -> Flask:

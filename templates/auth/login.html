@@ -22,7 +22,13 @@
   </form>
 
   <p class="muted" style="margin-top:1rem;">
-    Don’t have an account? <a href="{{ url_for('auth.register_page') }}">Register</a>
+    <a href="{{ url_for(‘auth.forgot_password_page’) }}">Forgot password?</a>
+  </p>
+  <p class="muted" style="margin-top:.5rem;">
+    Don’t have an account? <a href="{{ url_for(‘auth.register_page’) }}">Register</a>
+  </p>
+  <p class="muted" style="margin-top:.5rem;">
+    Didn’t get verification email? <a href="{{ url_for(‘auth.resend_verification_page’) }}">Resend it</a>
   </p>
 </section>
 {% endblock %}
