@@ -49,6 +49,8 @@ def create_app() -> Flask:
         if request.method == "POST":
             if request.path.startswith("/socket.io/"):
                 return
+            if request.path.startswith("/api/") and request.is_json:
+                return
             if not validate_csrf_token():
                 abort(403)
 
