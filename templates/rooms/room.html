@@ -10,29 +10,34 @@
 
 <!-- ── Far left: My Tasks ────────────────────────────────────────────────── -->
 <div style="width:260px; flex-shrink:0; position:sticky; top:1rem;">
-  <div class="card" style="display:flex; flex-direction:column; height:calc(100vh - 5rem); max-height:700px;">
-    <h3 style="margin:0 0 .75rem; flex-shrink:0;">✅ My Tasks</h3>
+  <div class="card todo-panel" style="display:flex; flex-direction:column; height:calc(100vh - 5rem); max-height:700px;">
+    <button class="todo-toggle-btn" onclick="todoTogglePanel(this)" aria-expanded="true" style="margin:0 0 .75rem;">
+      <span>✅ My Tasks</span>
+      <span class="todo-arrow">▲</span>
+    </button>
 
-    <ul id="todo-list"
-        style="flex:1; overflow-y:auto; list-style:none; padding:0; margin:0; display:flex; flex-direction:column; gap:.45rem;">
-      <!-- filled by JS -->
-    </ul>
+    <div class="todo-panel-body open" style="flex:1; min-height:0; display:flex; flex-direction:column; gap:.45rem;">
+      <ul id="todo-list"
+          style="flex:1; overflow-y:auto; list-style:none; padding:0; margin:0; display:flex; flex-direction:column; gap:.45rem;">
+        <!-- filled by JS -->
+      </ul>
 
-    <form id="todo-form" onsubmit="todoAdd(event)"
-          style="margin-top:.75rem; flex-shrink:0; display:flex; flex-direction:column; gap:.45rem;">
-      <div style="display:flex; gap:.4rem;">
-        <input id="todo-input" type="text" maxlength="300" placeholder="Add a task…"
-               autocomplete="off"
-               style="flex:1; padding:.5rem .7rem; border-radius:.75rem;
-                      border:1px solid var(--border); background:var(--surface);
-                      color:var(--text); font-size:.85rem;">
-        <button type="submit" class="btn primary" style="padding:.5rem .85rem; font-size:.85rem;">+</button>
-      </div>
-      <label style="display:flex; align-items:center; gap:.4rem; font-size:.78rem; opacity:.6; cursor:pointer;">
-        <input type="checkbox" id="todo-public" style="width:.85rem; height:.85rem;">
-        Public
-      </label>
-    </form>
+      <form id="todo-form" onsubmit="todoAdd(event)"
+            style="flex-shrink:0; display:flex; flex-direction:column; gap:.45rem;">
+        <div style="display:flex; gap:.4rem;">
+          <input id="todo-input" type="text" maxlength="300" placeholder="Add a task…"
+                 autocomplete="off"
+                 style="flex:1; padding:.5rem .7rem; border-radius:.75rem;
+                        border:1px solid var(--border); background:var(--surface);
+                        color:var(--text); font-size:.85rem;">
+          <button type="submit" class="btn primary" style="padding:.5rem .85rem; font-size:.85rem;">+</button>
+        </div>
+        <label style="display:flex; align-items:center; gap:.4rem; font-size:.78rem; opacity:.6; cursor:pointer;">
+          <input type="checkbox" id="todo-public" style="width:.85rem; height:.85rem;">
+          Public
+        </label>
+      </form>
+    </div>
   </div>
 </div>
 
@@ -834,6 +839,14 @@
     li.appendChild(label);
     li.appendChild(del);
     return li;
+  }
+
+  function todoTogglePanel(btn) {
+    const body = btn.closest('.card').querySelector('.todo-panel-body');
+    const arrow = btn.querySelector('.todo-arrow');
+    const isOpen = body.classList.toggle('open');
+    btn.setAttribute('aria-expanded', isOpen);
+    if (arrow) arrow.textContent = isOpen ? '▲' : '▼';
   }
 
   async function todoLoad() {

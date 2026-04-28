@@ -346,6 +346,18 @@ a {
   .room-layout > .auth-card { width: 100% !important; }
   .room-layout > div[style*="width:320px"],
   .room-layout > div[style*="width:260px"] { width: 100% !important; position: static !important; }
+
+  /* Navbar mobile — hide greeting text, compress */
+  .nav-hello { display: none; }
+  .nav-links { flex-wrap: wrap; gap: .5rem; }
+
+  /* My Tasks mobile — collapsible, compact height */
+  .todo-panel-body { display: none; }
+  .todo-panel-body.open { display: flex !important; flex-direction: column; }
+  .todo-panel { height: auto !important; max-height: none !important; }
+  .todo-toggle-btn { cursor: pointer; user-select: none; width: 100%; background: none; border: none;
+                     color: var(--text); font-size: 1rem; font-weight: 600;
+                     display: flex; align-items: center; justify-content: space-between; padding: 0; }
 }
 
 .room-actions {

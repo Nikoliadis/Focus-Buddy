@@ -1,17 +1,20 @@
 from __future__ import annotations
 
 import os
-import resend
-
-resend.api_key = os.getenv("RESEND_API_KEY", "")
 
 _FROM = "FocusBuddy <noreply@thefocusbuddy.org>"
 
 
 def _send(to: str, subject: str, html: str) -> None:
-    if not resend.api_key:
+    api_key = os.getenv("RESEND_API_KEY", "")
+    if not api_key:
         return
-    resend.Emails.send({"from": _FROM, "to": [to], "subject": subject, "html": html})
+    try:
+        import resend
+        resend.api_key = api_key
+        resend.Emails.send({"from": _FROM, "to": [to], "subject": subject, "html": html})
+    except Exception:
+        pass
 
 
 def send_verification_email(to: str, username: str, verify_url: str) -> None:

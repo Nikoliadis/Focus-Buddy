@@ -88,6 +88,12 @@ def create_app() -> Flask:
 
     with app.app_context():
         db.create_all()
+        # Add email_verified column to existing users table if missing
+        with db.engine.connect() as conn:
+            conn.execute(db.text(
+                "ALTER TABLE users ADD COLUMN IF NOT EXISTS email_verified BOOLEAN NOT NULL DEFAULT true"
+            ))
+            conn.commit()
 
     return app
 
