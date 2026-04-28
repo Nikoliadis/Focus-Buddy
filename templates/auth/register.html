@@ -2,34 +2,68 @@
 {% block title %}Register | FocusBuddy{% endblock %}
 
 {% block content %}
-<section class="auth-card">
-  <h1>Register</h1>
+<div style="min-height:70vh; display:flex; align-items:center; justify-content:center; padding:2rem 0;">
+  <section class="auth-card" style="width:min(420px,100%); margin:0;">
 
-  <form method="post" action="{{ url_for('auth.register_post') }}">
-    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-    <label for="username">Username</label>
-    <input id="username" name="username" autocomplete="username" required>
-
-    <label for="email">Email</label>
-    <input id="email" name="email" type="email" autocomplete="email" required>
-
-    <label for="password">Password</label>
-    <div class="password-wrap">
-      <input id="password" name="password" type="password" autocomplete="new-password" required>
-      <button type="button" class="pw-toggle" onclick="togglePw('password', this)" aria-label="Show password">👁</button>
+    <div style="text-align:center; margin-bottom:1.5rem;">
+      <div style="font-size:2rem; margin-bottom:.4rem;">&#128640;</div>
+      <h1 style="margin:0; font-size:1.6rem;">Create account</h1>
+      <p style="margin:.35rem 0 0; opacity:.55; font-size:.9rem;">Join FocusBuddy and start studying smarter</p>
     </div>
 
-    <label for="confirm">Confirm Password</label>
-    <div class="password-wrap">
-      <input id="confirm" name="confirm" type="password" autocomplete="new-password" required>
-      <button type="button" class="pw-toggle" onclick="togglePw('confirm', this)" aria-label="Show password">👁</button>
+    <form method="post" action="{{ url_for('auth.register_post') }}" style="display:grid; gap:.75rem;">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+
+      <div style="display:grid; gap:.3rem;">
+        <label for="username" style="font-size:.85rem; font-weight:500; opacity:.8;">Username</label>
+        <input id="username" name="username" autocomplete="username" required
+               placeholder="e.g. studymaster99"
+               style="padding:.7rem .9rem; border-radius:.75rem; border:1px solid var(--border);
+                      background:var(--surface); color:var(--text); font-size:.95rem; width:100%; box-sizing:border-box;">
+      </div>
+
+      <div style="display:grid; gap:.3rem;">
+        <label for="email" style="font-size:.85rem; font-weight:500; opacity:.8;">Email</label>
+        <input id="email" name="email" type="email" autocomplete="email" required
+               placeholder="you@example.com"
+               style="padding:.7rem .9rem; border-radius:.75rem; border:1px solid var(--border);
+                      background:var(--surface); color:var(--text); font-size:.95rem; width:100%; box-sizing:border-box;">
+      </div>
+
+      <div style="display:grid; gap:.3rem;">
+        <label for="password" style="font-size:.85rem; font-weight:500; opacity:.8;">Password</label>
+        <div class="password-wrap">
+          <input id="password" name="password" type="password" autocomplete="new-password" required
+                 placeholder="Min. 8 characters"
+                 style="padding:.7rem .9rem; border-radius:.75rem; border:1px solid var(--border);
+                        background:var(--surface); color:var(--text); font-size:.95rem; width:100%; box-sizing:border-box;">
+          <button type="button" class="pw-toggle" onclick="togglePw('password', this)" aria-label="Show password">&#128065;</button>
+        </div>
+      </div>
+
+      <div style="display:grid; gap:.3rem;">
+        <label for="confirm" style="font-size:.85rem; font-weight:500; opacity:.8;">Confirm Password</label>
+        <div class="password-wrap">
+          <input id="confirm" name="confirm" type="password" autocomplete="new-password" required
+                 placeholder="Repeat your password"
+                 style="padding:.7rem .9rem; border-radius:.75rem; border:1px solid var(--border);
+                        background:var(--surface); color:var(--text); font-size:.95rem; width:100%; box-sizing:border-box;">
+          <button type="button" class="pw-toggle" onclick="togglePw('confirm', this)" aria-label="Show password">&#128065;</button>
+        </div>
+      </div>
+
+      <button class="btn primary" type="submit"
+              style="width:100%; padding:.85rem; font-size:1rem; font-weight:600; margin-top:.25rem; border-radius:.85rem;">
+        Create account
+      </button>
+    </form>
+
+    <div style="margin-top:1.25rem; text-align:center; font-size:.875rem;">
+      <p style="margin:0; opacity:.6;">
+        Already have an account? <a href="{{ url_for('auth.login_page') }}" style="color:#38bdf8; font-weight:500;">Sign in</a>
+      </p>
     </div>
 
-    <button class="btn primary" type="submit">Create account</button>
-  </form>
-
-  <p class="muted" style="margin-top:1rem;">
-    Already have an account? <a href="{{ url_for('auth.login_page') }}">Login</a>
-  </p>
-</section>
+  </section>
+</div>
 {% endblock %}

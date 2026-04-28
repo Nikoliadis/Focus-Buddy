@@ -2,33 +2,54 @@
 {% block title %}Login | FocusBuddy{% endblock %}
 
 {% block content %}
-<section class="auth-card">
-  <h1>Login</h1>
+<div style="min-height:70vh; display:flex; align-items:center; justify-content:center; padding:2rem 0;">
+  <section class="auth-card" style="width:min(420px,100%); margin:0;">
 
-  <form method="post" action="{{ url_for('auth.login_post') }}">
-    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-    <input type="hidden" name="next" value="{{ next or '' }}">
-
-    <label for="identifier">Username or Email</label>
-    <input id="identifier" name="identifier" autocomplete="username" required>
-
-    <label for="password">Password</label>
-    <div class="password-wrap">
-      <input id="password" name="password" type="password" autocomplete="current-password" required>
-      <button type="button" class="pw-toggle" onclick="togglePw('password', this)" aria-label="Show password">&#128065;</button>
+    <div style="text-align:center; margin-bottom:1.5rem;">
+      <div style="font-size:2rem; margin-bottom:.4rem;">&#127775;</div>
+      <h1 style="margin:0; font-size:1.6rem;">Welcome back</h1>
+      <p style="margin:.35rem 0 0; opacity:.55; font-size:.9rem;">Sign in to your FocusBuddy account</p>
     </div>
 
-    <button class="btn primary" type="submit">Sign in</button>
-  </form>
+    <form method="post" action="{{ url_for('auth.login_post') }}" style="display:grid; gap:.75rem;">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <input type="hidden" name="next" value="{{ next or '' }}">
 
-  <p class="muted" style="margin-top:1rem;">
-    <a href="{{ url_for('auth.forgot_password_page') }}">Forgot password?</a>
-  </p>
-  <p class="muted" style="margin-top:.5rem;">
-    Don't have an account? <a href="{{ url_for('auth.register_page') }}">Register</a>
-  </p>
-  <p class="muted" style="margin-top:.5rem;">
-    Didn't get verification email? <a href="{{ url_for('auth.resend_verification_page') }}">Resend it</a>
-  </p>
-</section>
+      <div style="display:grid; gap:.3rem;">
+        <label for="identifier" style="font-size:.85rem; font-weight:500; opacity:.8;">Username or Email</label>
+        <input id="identifier" name="identifier" autocomplete="username" required
+               style="padding:.7rem .9rem; border-radius:.75rem; border:1px solid var(--border);
+                      background:var(--surface); color:var(--text); font-size:.95rem; width:100%; box-sizing:border-box;">
+      </div>
+
+      <div style="display:grid; gap:.3rem;">
+        <label for="password" style="font-size:.85rem; font-weight:500; opacity:.8;">Password</label>
+        <div class="password-wrap">
+          <input id="password" name="password" type="password" autocomplete="current-password" required
+                 style="padding:.7rem .9rem; border-radius:.75rem; border:1px solid var(--border);
+                        background:var(--surface); color:var(--text); font-size:.95rem; width:100%; box-sizing:border-box;">
+          <button type="button" class="pw-toggle" onclick="togglePw('password', this)" aria-label="Show password">&#128065;</button>
+        </div>
+      </div>
+
+      <button class="btn primary" type="submit"
+              style="width:100%; padding:.85rem; font-size:1rem; font-weight:600; margin-top:.25rem; border-radius:.85rem;">
+        Sign in
+      </button>
+    </form>
+
+    <div style="margin-top:1.25rem; display:grid; gap:.4rem; text-align:center; font-size:.875rem;">
+      <p style="margin:0; opacity:.6;">
+        <a href="{{ url_for('auth.forgot_password_page') }}" style="color:var(--text); text-decoration:underline; opacity:.8;">Forgot password?</a>
+      </p>
+      <p style="margin:0; opacity:.6;">
+        No account? <a href="{{ url_for('auth.register_page') }}" style="color:#38bdf8; font-weight:500;">Register</a>
+      </p>
+      <p style="margin:0; opacity:.5; font-size:.82rem;">
+        No verification email? <a href="{{ url_for('auth.resend_verification_page') }}" style="color:var(--text); text-decoration:underline;">Resend it</a>
+      </p>
+    </div>
+
+  </section>
+</div>
 {% endblock %}
