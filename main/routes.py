@@ -68,8 +68,6 @@ def leaderboard():
     return render_template("leaderboard.html", entries=entries)
 
 
-# ── Todo JSON API (used by the in-room widget) ────────────────────────────────
-
 @main_bp.get("/api/todos")
 @login_required
 def api_todos_list():
@@ -120,8 +118,6 @@ def api_todos_delete(item_id: int):
     return jsonify({"ok": True})
 
 
-# ── AI Chat ───────────────────────────────────────────────────────────────────
-
 @main_bp.post("/api/ai/chat")
 @login_required
 @limiter.limit("20 per minute")
@@ -136,7 +132,6 @@ def api_ai_chat():
         return jsonify({"error": "Invalid message"}), 400
 
     history = data.get("history") or []
-    # Keep last 10 exchanges to limit token usage
     history = history[-10:]
     messages = [
         {"role": m["role"], "content": m["content"]}

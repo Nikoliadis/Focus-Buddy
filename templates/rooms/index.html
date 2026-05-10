@@ -21,29 +21,33 @@
     <div class="grid">
       {% for item in my_rooms %}
         {% set room = item.room %}
-        <div class="card">
-          <h3 style="margin-top:0;">
+        <div class="card" style="position:relative; cursor:pointer;">
+          <a href="{{ url_for('rooms.room_detail', room_id=room.id) }}"
+             style="position:absolute; inset:0; border-radius:1rem; z-index:0;"
+             aria-label="Open {{ room.name }}"></a>
+
+          <h3 style="margin-top:0; position:relative; z-index:1;">
             {{ room.name }}
             {% if room.is_private %}
               <span title="Private room" style="font-size:.9rem; opacity:.7;">🔒</span>
             {% endif %}
           </h3>
 
-          <p class="muted" style="margin:.25rem 0 .1rem;">
+          <p class="muted" style="margin:.25rem 0 .1rem; position:relative; z-index:1;">
             Owner: <strong>{{ item.owner | title }}</strong>
             {% if room.owner_id == session.get('user_id') %}
               <span style="opacity:.5; font-size:.85rem;">(you)</span>
             {% endif %}
           </p>
 
-          <p class="muted" style="margin:.1rem 0 .6rem; font-size:.9rem;">
+          <p class="muted" style="margin:.1rem 0 .6rem; font-size:.9rem; position:relative; z-index:1;">
             {{ item.member_count }} member{{ 's' if item.member_count != 1 }}
             {% if room.join_code %}
               &nbsp;·&nbsp; Code: <strong>{{ room.join_code }}</strong>
             {% endif %}
           </p>
 
-          <div class="actions room-actions">
+          <div class="actions room-actions" style="position:relative; z-index:1;">
             <a class="btn secondary"
                href="{{ url_for('rooms.room_detail', room_id=room.id) }}">
               Open
@@ -73,7 +77,8 @@
   <div class="grid">
     {% for item in public_rooms %}
       {% set room = item.room %}
-      <div class="card">
+      <div class="card" style="position:relative; cursor:pointer;"
+           onclick="this.querySelector('form').submit()">
         <h3 style="margin-top:0;">{{ room.name }}</h3>
 
         <p class="muted" style="margin:.25rem 0 .1rem;">
@@ -85,7 +90,7 @@
 
         <form method="post"
               action="{{ url_for('rooms.room_join_public', room_id=room.id) }}"
-              style="margin:0;">
+              style="margin:0; position:relative; z-index:1;">
           <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
           <button type="submit" class="btn primary">Join</button>
         </form>

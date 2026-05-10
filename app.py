@@ -31,19 +31,14 @@ def create_app() -> Flask:
     app = Flask(__name__)
     app.config.from_object(Config)
 
-    # init extensions
     db.init_app(app)
     socketio.init_app(app)
     limiter.init_app(app)
 
-    # blueprints
     app.register_blueprint(main_bp)
     app.register_blueprint(auth_bp)
     app.register_blueprint(rooms_bp)
 
-    # ------------------------------------------------------------------ #
-    # CSRF protection — validate token on every POST (skip SocketIO path) #
-    # ------------------------------------------------------------------ #
     @app.before_request
     def csrf_protect():
         if request.method == "POST":
@@ -54,20 +49,14 @@ def create_app() -> Flask:
             if not validate_csrf_token():
                 abort(403)
 
-    # ------------------------------------------------------------------ #
-    # Template globals                                                     #
-    # ------------------------------------------------------------------ #
     @app.context_processor
     def inject_globals():
         return {
             "year": datetime.now().year,
             "csrf_token": generate_csrf_token,
-            "STATIC_VERSION": "4",
+            "STATIC_VERSION": "5",
         }
 
-    # ------------------------------------------------------------------ #
-    # Error handlers                                                       #
-    # ------------------------------------------------------------------ #
     @app.errorhandler(400)
     def bad_request(_e):
         return render_template("errors/400.html"), 400
@@ -90,7 +79,6 @@ def create_app() -> Flask:
 
     with app.app_context():
         db.create_all()
-        # Add email_verified column to existing users table if missing
         with db.engine.connect() as conn:
             conn.execute(db.text(
                 "ALTER TABLE users ADD COLUMN IF NOT EXISTS email_verified BOOLEAN NOT NULL DEFAULT true"
