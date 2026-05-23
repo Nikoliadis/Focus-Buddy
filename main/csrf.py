@@ -15,7 +15,11 @@ def generate_csrf_token() -> str:
 
 def validate_csrf_token() -> bool:
     """Return True if the CSRF token in the request matches the session token."""
-    token = request.form.get("csrf_token") or request.headers.get("X-CSRF-Token", "")
+    try:
+        form_token = request.form.get("csrf_token")
+    except Exception:
+        form_token = None
+    token = form_token or request.headers.get("X-CSRF-Token", "")
     expected = session.get("csrf_token", "")
     if not token or not expected:
         return False
