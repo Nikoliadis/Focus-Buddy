@@ -1,13 +1,13 @@
 services:
   db:
     image: postgres:16-alpine
-    container_name: focusbuddy_db
     environment:
       POSTGRES_DB: focusbuddy
       POSTGRES_USER: focusbuddy
       POSTGRES_PASSWORD: focusbuddy_pass
     ports:
-      - "5432:5432"
+      # Change with DB_PORT=5433 if 5432 is already taken on your machine
+      - "${DB_PORT:-5432}:5432"
     volumes:
       - pgdata:/var/lib/postgresql/data
     healthcheck:
@@ -18,13 +18,15 @@ services:
 
   web:
     build: .
-    container_name: focusbuddy_web
     environment:
-      SECRET_KEY: "dev-secret"
+      SECRET_KEY: "${SECRET_KEY:-dev-secret}"
       COOKIE_SECURE: "0"
-      DATABASE_URL: "postgresql+psycopg://focusbuddy:focusbuddy_pass@focusbuddy_db:5432/focusbuddy"
+      DATABASE_URL: "postgresql+psycopg://focusbuddy:focusbuddy_pass@db:5432/focusbuddy"
+      # Optional: FocusBot and transactional emails stay disabled when these are empty
+      GROQ_API_KEY: "${GROQ_API_KEY:-}"
+      RESEND_API_KEY: "${RESEND_API_KEY:-}"
     ports:
-      - "5000:5000"
+      - "${WEB_PORT:-5000}:5000"
     depends_on:
       db:
         condition: service_healthy

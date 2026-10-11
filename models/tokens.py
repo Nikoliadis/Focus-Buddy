@@ -16,7 +16,7 @@ class EmailVerificationToken(db.Model):
     used       = db.Column(db.Boolean, nullable=False, default=False)
 
     @staticmethod
-    def generate(user_id: int) -> "EmailVerificationToken":
+    def generate(user_id: int) -> EmailVerificationToken:
         tok = EmailVerificationToken(user_id=user_id, token=secrets.token_urlsafe(64))
         db.session.add(tok)
         return tok
@@ -37,7 +37,7 @@ class PasswordResetToken(db.Model):
     used       = db.Column(db.Boolean, nullable=False, default=False)
 
     @staticmethod
-    def generate(user_id: int) -> "PasswordResetToken":
+    def generate(user_id: int) -> PasswordResetToken:
         tok = PasswordResetToken(user_id=user_id, token=secrets.token_urlsafe(64))
         db.session.add(tok)
         return tok

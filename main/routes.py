@@ -2,15 +2,16 @@ import csv
 import io
 import os
 
-from flask import render_template, session, Response, request, redirect, url_for, jsonify
+from flask import Response, jsonify, render_template, request, session
 
 from main.auth_utils import login_required
 from main.db import db
 from main.limiter_ext import limiter
-from main.stats_service import get_user_stats, get_leaderboard
+from main.stats_service import get_leaderboard, get_user_stats
 from models.focus import FocusLog
 from models.todo import TodoItem
 from rooms.models import Room
+
 from . import main_bp
 
 _AI_SYSTEM = (

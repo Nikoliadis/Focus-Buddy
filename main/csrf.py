@@ -3,7 +3,7 @@ from __future__ import annotations
 import hmac
 import secrets
 
-from flask import session, request
+from flask import request, session
 
 
 def generate_csrf_token() -> str:

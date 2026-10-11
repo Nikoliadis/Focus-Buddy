@@ -3,7 +3,7 @@ from __future__ import annotations
 from datetime import datetime
 
 from main.db import db
-from models.focus import FocusSession, FocusLog
+from models.focus import FocusLog, FocusSession
 
 
 def get_active_session(room_id: int) -> FocusSession | None:

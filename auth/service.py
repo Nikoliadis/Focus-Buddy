@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from werkzeug.security import generate_password_hash, check_password_hash
+from werkzeug.security import check_password_hash, generate_password_hash
 
 from main.db import db
 from models.user import User

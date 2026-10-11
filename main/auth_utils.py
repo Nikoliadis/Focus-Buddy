@@ -1,9 +1,9 @@
 from __future__ import annotations
 
 from functools import wraps
-from urllib.parse import urlparse, urljoin
+from urllib.parse import urljoin, urlparse
 
-from flask import request, redirect, url_for, session, flash
+from flask import flash, redirect, request, session, url_for
 
 
 def _is_safe_url(target: str) -> bool:

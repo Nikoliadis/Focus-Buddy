@@ -2,21 +2,22 @@ from __future__ import annotations
 
 import re
 
-from flask import render_template, request, redirect, url_for, flash, session
+from flask import flash, redirect, render_template, request, session, url_for
 from werkzeug.security import generate_password_hash
 
 from main.auth_utils import login_required
 from main.db import db
+from main.email_utils import send_password_reset_email, send_verification_email
 from main.limiter_ext import limiter
-from main.email_utils import send_verification_email, send_password_reset_email
-from models.user import User
 from models.tokens import EmailVerificationToken, PasswordResetToken
+from models.user import User
+
 from . import auth_bp
 from .service import (
+    create_user,
+    find_user_by_email,
     find_user_by_login_identifier,
     find_user_by_username,
-    find_user_by_email,
-    create_user,
     verify_password,
 )
 

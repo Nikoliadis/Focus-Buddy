@@ -1,35 +1,36 @@
 from gevent import monkey
+
 monkey.patch_all()
 
 from dotenv import load_dotenv
+
 load_dotenv()
 
 from datetime import datetime
 
-from flask import Flask, render_template, abort, request
-
-from config import Config
-from main.db import db
-from main.socketio_ext import socketio
-from main.limiter_ext import limiter
-from main.csrf import generate_csrf_token, validate_csrf_token
-
-from main import main_bp
-from auth import auth_bp
-from rooms import rooms_bp
+from flask import Flask, abort, render_template, request
 
 import rooms.sockets
-
-from models.user import User
-from models.focus import FocusSession, FocusLog
+from auth import auth_bp
+from config import Config
+from main import main_bp
+from main.csrf import generate_csrf_token, validate_csrf_token
+from main.db import db
+from main.limiter_ext import limiter
+from main.socketio_ext import socketio
 from models.chat import ChatMessage
+from models.focus import FocusLog, FocusSession
 from models.todo import TodoItem
 from models.tokens import EmailVerificationToken, PasswordResetToken
+from models.user import User
+from rooms import rooms_bp
 
 
-def create_app() -> Flask:
+def create_app(test_config: dict | None = None) -> Flask:
     app = Flask(__name__)
     app.config.from_object(Config)
+    if test_config:
+        app.config.update(test_config)
 
     db.init_app(app)
     socketio.init_app(app)
@@ -79,11 +80,12 @@ def create_app() -> Flask:
 
     with app.app_context():
         db.create_all()
-        with db.engine.connect() as conn:
-            conn.execute(db.text(
-                "ALTER TABLE users ADD COLUMN IF NOT EXISTS email_verified BOOLEAN NOT NULL DEFAULT true"
-            ))
-            conn.commit()
+        if db.engine.dialect.name == "postgresql":
+            with db.engine.connect() as conn:
+                conn.execute(db.text(
+                    "ALTER TABLE users ADD COLUMN IF NOT EXISTS email_verified BOOLEAN NOT NULL DEFAULT true"
+                ))
+                conn.commit()
 
     return app
 

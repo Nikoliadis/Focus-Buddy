@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from datetime import datetime
+
 from main.db import db
 
 
@@ -22,7 +23,7 @@ class FocusSession(db.Model):
 
     started_at = db.Column(db.DateTime, nullable=True)
     ended_at = db.Column(db.DateTime, nullable=True)
-    
+
     # pause tracking
     paused_at = db.Column(db.DateTime, nullable=True)
     paused_seconds = db.Column(db.Integer, nullable=False, default=0)
@@ -57,7 +58,9 @@ class FocusLog(db.Model):
 
     user_id = db.Column(db.Integer, nullable=False, index=True)
     room_id = db.Column(db.Integer, db.ForeignKey("rooms.id", ondelete="CASCADE"), nullable=False, index=True)
-    session_id = db.Column(db.Integer, db.ForeignKey("focus_sessions.id", ondelete="CASCADE"), nullable=False, index=True)
+    session_id = db.Column(
+        db.Integer, db.ForeignKey("focus_sessions.id", ondelete="CASCADE"), nullable=False, index=True
+    )
 
     focused_seconds = db.Column(db.Integer, nullable=False, default=0)
 

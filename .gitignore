@@ -15,6 +15,7 @@ venv/
 # =====================
 .env
 .env.*
+!.env.example
 
 # =====================
 # Flask
@@ -33,6 +34,7 @@ docker-compose.override.yml
 # =====================
 pgdata/
 *.sqlite3
+*.db
 
 # =====================
 # IDE / OS
@@ -41,3 +43,12 @@ pgdata/
 .idea/
 .DS_Store
 Thumbs.db
+
+# =====================
+# Testing / tooling
+# =====================
+.pytest_cache/
+.ruff_cache/
+.coverage
+coverage.xml
+htmlcov/

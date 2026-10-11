@@ -3,21 +3,22 @@ from __future__ import annotations
 from datetime import datetime
 
 from flask import session
-from flask_socketio import join_room, leave_room, emit
+from flask_socketio import emit, join_room, leave_room
 
 from main.db import db
 from main.socketio_ext import socketio
 from models.chat import ChatMessage
+
 from .models import RoomMember, RoomMute
+from .presence_store import LAST_SEEN, PRESENCE, ROOM_CYCLES
 from .service import get_room
-from .presence_store import PRESENCE, LAST_SEEN, ROOM_CYCLES
 from .sessions_service import (
-    get_active_session,
-    start_session,
-    pause_session,
-    resume_session,
-    reset_session,
     end_session,
+    get_active_session,
+    pause_session,
+    reset_session,
+    resume_session,
+    start_session,
 )
 
 

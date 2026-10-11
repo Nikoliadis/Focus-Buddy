@@ -1,0 +1,38 @@
+[project]
+name = "focusbuddy"
+version = "1.0.0"
+description = "Real-time collaborative study rooms with a synchronized Pomodoro timer and an AI study assistant."
+requires-python = ">=3.12"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-ra --strict-markers"
+filterwarnings = [
+    "ignore::DeprecationWarning",
+    "ignore::gevent.monkey.MonkeyPatchWarning",
+    "ignore::sqlalchemy.exc.LegacyAPIWarning",
+]
+
+[tool.coverage.run]
+source = ["app", "config", "auth", "main", "models", "rooms"]
+branch = true
+
+[tool.coverage.report]
+show_missing = true
+skip_covered = false
+
+[tool.ruff]
+line-length = 120
+target-version = "py312"
+extend-exclude = ["venv", ".venv"]
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "B", "UP"]
+ignore = [
+    "E402",  # gevent monkey-patching and blueprint route imports must run in a specific order
+]
+
+[tool.ruff.lint.per-file-ignores]
+"*/__init__.py" = ["F401"]
+"app.py" = ["F401"]  # models are imported so SQLAlchemy registers them before create_all()
+"tests/conftest.py" = ["I001"]

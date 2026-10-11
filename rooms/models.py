@@ -1,5 +1,7 @@
 from datetime import datetime
+
 from main.db import db
+
 
 class Room(db.Model):
     __tablename__ = "rooms"

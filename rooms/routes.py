@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from flask import render_template, request, redirect, url_for, flash, session, jsonify
+from flask import flash, jsonify, redirect, render_template, request, session, url_for
 
 from main.auth_utils import login_required
 from main.db import db
@@ -8,27 +8,27 @@ from models.user import User
 
 from . import rooms_bp
 from .models import RoomMember
-from .presence_store import PRESENCE, LAST_SEEN, ROOM_CYCLES
+from .presence_store import LAST_SEEN, PRESENCE, ROOM_CYCLES
 from .service import (
+    add_member,
     create_room,
-    get_user_rooms,
+    delete_room,
+    find_room_by_code,
     get_public_rooms,
     get_room,
-    add_member,
-    find_room_by_code,
     get_room_members,
+    get_user_rooms,
     remove_member,
-    delete_room,
     verify_room_password,
 )
 from .sessions_service import (
+    end_session,
     get_active_session,
     get_latest_session,
-    start_session,
     pause_session,
-    resume_session,
     reset_session,
-    end_session,
+    resume_session,
+    start_session,
 )
 
 

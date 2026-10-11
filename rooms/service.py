@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import secrets
-from typing import Optional, List, Tuple
 
 from sqlalchemy import func
 from sqlalchemy.exc import IntegrityError
@@ -9,6 +8,7 @@ from werkzeug.security import generate_password_hash
 
 from main.db import db
 from models.user import User
+
 from .models import Room, RoomMember
 
 
@@ -59,16 +59,17 @@ def delete_room(room_id: int) -> None:
     db.session.commit()
 
 
-def get_room(room_id: int) -> Optional[Room]:
+def get_room(room_id: int) -> Room | None:
     return Room.query.get(room_id)
 
 
 def get_user_rooms(user_id: int) -> list[dict]:
+    my_room_ids = db.session.query(RoomMember.room_id).filter(RoomMember.user_id == user_id)
     rows = (
         db.session.query(Room, User.username, func.count(RoomMember.id))
         .join(User, User.id == Room.owner_id)
         .join(RoomMember, RoomMember.room_id == Room.id)
-        .filter(RoomMember.user_id == user_id)
+        .filter(Room.id.in_(my_room_ids))
         .group_by(Room.id, User.username)
         .order_by(Room.created_at.desc())
         .all()
@@ -90,7 +91,7 @@ def get_public_rooms() -> list[dict]:
     return [{"room": r, "owner": uname, "member_count": cnt} for r, uname, cnt in rows]
 
 
-def find_room_by_code(code: str) -> Optional[Room]:
+def find_room_by_code(code: str) -> Room | None:
     c = (code or "").strip().upper()
     if not c:
         return None
@@ -104,7 +105,7 @@ def verify_room_password(room: Room, password: str) -> bool:
     return room.room_password == (password or "")
 
 
-def get_room_members(room: Room) -> List[Tuple[User, bool]]:
+def get_room_members(room: Room) -> list[tuple[User, bool]]:
     """
     Returns list of (User, is_owner) for a room.
     """
@@ -116,7 +117,7 @@ def get_room_members(room: Room) -> List[Tuple[User, bool]]:
         .all()
     )
 
-    members: List[Tuple[User, bool]] = []
+    members: list[tuple[User, bool]] = []
     for user, _membership in rows:
         members.append((user, user.id == room.owner_id))
     return members
