@@ -1,0 +1,6 @@
+# Data / analytics stack. Kept separate from requirements.txt so the web image stays lean.
+-r requirements.txt
+
+pandas==3.0.6
+numpy==2.5.3
+tzdata==2026.4
