@@ -57,3 +57,8 @@ htmlcov/
 # Generated reports (may contain real user data)
 # =====================
 reports/
+
+# =====================
+# Trained model artifacts
+# =====================
+artifacts/
