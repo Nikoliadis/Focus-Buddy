@@ -43,8 +43,12 @@ def generate(
     seed: int = 0,
     start: str = "2026-01-05",
     tz: str = cleaning.DEFAULT_LOCAL_TZ,
-) -> tuple[pd.DataFrame, pd.DataFrame]:
-    """Return ``(logs, rooms)`` shaped like the cleaned frames from ``analytics.dataset``."""
+    return_users: bool = False,
+) -> tuple[pd.DataFrame, pd.DataFrame] | tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
+    """Return ``(logs, rooms)`` shaped like the cleaned frames from ``analytics.dataset``.
+
+    With ``return_users=True`` also return the hidden per-user ground truth
+    (discipline, chronotype, ...), for checking what an unsupervised model recovers."""
     rng = np.random.default_rng(seed)
     first_day = pd.Timestamp(start, tz=tz)
     n_rooms = max(1, n_users // 3)
@@ -57,7 +61,7 @@ def generate(
         "current_member_count": rng.integers(1, 8, n_rooms),
     })
 
-    records = []
+    records, truth = [], []
     log_id = 0
     for user in range(1, n_users + 1):
         discipline = rng.beta(5, 2.5)
@@ -66,6 +70,8 @@ def generate(
         p_long = rng.uniform(0.05, 0.5)
         room = int(rng.integers(1, n_rooms + 1))
         last_end = None
+        truth.append({"user_id": user, "discipline": discipline, "chronotype": "morning" if peak_hour == 10
+                      else "evening", "sessions_per_day": sessions_per_day, "p_long": p_long})
 
         for day in range(days):
             n_today = rng.poisson(sessions_per_day)
@@ -103,4 +109,6 @@ def generate(
     raw = pd.DataFrame.from_records(records)
     now = first_day + pd.Timedelta(days=days + 1)
     logs, _ = cleaning.clean_focus_logs(raw, now=now.tz_convert("UTC"))
+    if return_users:
+        return logs, rooms, pd.DataFrame(truth)
     return logs, rooms

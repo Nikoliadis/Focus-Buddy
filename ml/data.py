@@ -39,13 +39,12 @@ def model_splits(table: pd.DataFrame, test_fraction: float = 0.2, validation_fra
                        outer.purged + inner.purged)
 
 
-def load_table(source: str, seed: int = 0) -> pd.DataFrame:
-    """Feature table from ``synthetic`` data or the configured database (``db``, read-only)."""
+def load_logs_rooms(source: str, seed: int = 0) -> tuple[pd.DataFrame, pd.DataFrame]:
+    """Cleaned ``(logs, rooms)`` from ``synthetic`` data or the configured database (``db``, read-only)."""
     if source == "synthetic":
         from ml import synthetic
 
-        logs, rooms = synthetic.generate(seed=seed)
-        return build_feature_table(logs, rooms)
+        return synthetic.generate(seed=seed)
     if source != "db":
         raise ValueError(f"unknown source {source!r}")
 
@@ -57,4 +56,9 @@ def load_table(source: str, seed: int = 0) -> pd.DataFrame:
         raise SystemExit("DATABASE_URL is not set.")
     with engine.connect() as conn:
         ds = load_dataset(conn)
-    return build_feature_table(ds.logs, ds.rooms)
+    return ds.logs, ds.rooms
+
+
+def load_table(source: str, seed: int = 0) -> pd.DataFrame:
+    """Session-level feature table (see ml.features) for ``synthetic`` or ``db``."""
+    return build_feature_table(*load_logs_rooms(source, seed))
