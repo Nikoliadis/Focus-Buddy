@@ -1,22 +1,13 @@
 """Inference: load a trained model and predict. Never trains."""
 from __future__ import annotations
 
-import json
-from pathlib import Path
-
-import joblib
 import pandas as pd
 from sklearn.base import BaseEstimator
 
+from ml.artifacts import load
 from ml.features import FEATURE_COLUMNS
 
-
-def load(model_path: str | Path) -> tuple[BaseEstimator, dict]:
-    path = Path(model_path)
-    meta = json.loads(path.with_suffix(".json").read_text(encoding="utf-8"))
-    if meta["features"] != list(FEATURE_COLUMNS):
-        raise ValueError("model was trained on a different feature set; retrain it")
-    return joblib.load(path), meta
+__all__ = ["load", "predict"]
 
 
 def predict(model: BaseEstimator, features: pd.DataFrame) -> pd.Series:

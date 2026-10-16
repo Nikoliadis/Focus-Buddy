@@ -5,6 +5,7 @@ would write by hand.
 """
 from __future__ import annotations
 
+import numpy as np
 import pandas as pd
 from sklearn.base import BaseEstimator, RegressorMixin
 from sklearn.compose import ColumnTransformer
@@ -15,6 +16,7 @@ from sklearn.linear_model import LinearRegression
 from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import StandardScaler
 
+from analytics.analysis import FULL_DURATION_THRESHOLD
 from ml.features import FEATURE_COLUMNS
 
 # Raw `hour` and `weekday` are categories stored as integers. A linear model would read
@@ -46,6 +48,48 @@ class UserHistoryBaseline(RegressorMixin, BaseEstimator):
         return (past_ratio * planned).fillna(planned).to_numpy(dtype=float)
 
 
+class HurdleRegressor(RegressorMixin, BaseEstimator):
+    """Two-part model for a target that is mostly exactly the planned length.
+
+        P(early)       logistic classifier: will the session end early?
+        early_ratio    random forest on early sessions only: what share of the plan?
+
+    point="mean":    ŷ = (1 - P) · planned + P · early_ratio · planned
+                     the expected value, the right summary for squared-error metrics
+    point="median":  ŷ = planned if P < 0.5 else early_ratio · planned
+                     approximately the median of that mixture, the right summary for MAE
+                     (the median lies in the early part only when P >= 0.5)
+    """
+
+    def __init__(self, point: str = "mean", random_state: int = 0, n_jobs: int = 1):
+        self.point = point
+        self.random_state = random_state
+        self.n_jobs = n_jobs
+
+    def fit(self, X: pd.DataFrame, y):
+        from ml.classification.model import make_logistic  # local: classification imports this module
+
+        if self.point not in ("mean", "median"):
+            raise ValueError("point must be 'mean' or 'median'")
+        planned = X["planned_minutes"].to_numpy(dtype=float)
+        y = np.asarray(y, dtype=float)
+        early = y < FULL_DURATION_THRESHOLD * planned
+        self.classifier_ = make_logistic().fit(X, early.astype(int))
+        self.early_model_ = RandomForestRegressor(
+            n_estimators=200, min_samples_leaf=10, max_features=0.5,
+            random_state=self.random_state, n_jobs=self.n_jobs,
+        ).fit(X[early], y[early] / planned[early])
+        return self
+
+    def predict(self, X: pd.DataFrame):
+        planned = X["planned_minutes"].to_numpy(dtype=float)
+        p_early = self.classifier_.predict_proba(X)[:, 1]
+        early_minutes = np.clip(self.early_model_.predict(X), 0, 1) * planned
+        if self.point == "mean":
+            return (1 - p_early) * planned + p_early * early_minutes
+        return np.where(p_early < 0.5, planned, early_minutes)
+
+
 def make_models(random_state: int = 0, n_jobs: int = 1) -> dict[str, BaseEstimator]:
     """``n_jobs`` defaults to 1: joblib's parallel workers deadlock under gevent
     monkey-patching (which the web app applies), so parallelism must be opted into
@@ -74,6 +118,8 @@ def make_models(random_state: int = 0, n_jobs: int = 1) -> dict[str, BaseEstimat
         "baseline_user_history": UserHistoryBaseline(),
         "linear_regression": linear,
         "random_forest": forest,
+        "hurdle_mean": HurdleRegressor("mean", random_state, n_jobs),
+        "hurdle_median": HurdleRegressor("median", random_state, n_jobs),
     }
 
 

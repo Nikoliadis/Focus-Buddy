@@ -20,31 +20,27 @@ Usage:
 """
 from __future__ import annotations
 
-import json
 import time
 from dataclasses import asdict, dataclass, field
 from datetime import UTC, datetime
 from pathlib import Path
 
-import joblib
 import numpy as np
 import pandas as pd
 from sklearn.base import BaseEstimator, clone
 from sklearn.inspection import permutation_importance
 from sklearn.model_selection import train_test_split
 
+from ml import artifacts
+from ml.data import InsufficientDataError, load_table, model_splits
 from ml.evaluation.metrics import regression_metrics
-from ml.features import FEATURE_COLUMNS, TemporalSplit, features_and_target, temporal_split
+from ml.features import FEATURE_COLUMNS, features_and_target
 from ml.regression.model import is_baseline, make_models
 
+__all__ = ["InsufficientDataError", "RegressionReport", "load_table", "save", "train_and_evaluate"]
+
 TARGET = "target_focused_minutes"
-MIN_TRAIN_ROWS = 200
-MIN_TEST_ROWS = 50
 DEFAULT_ARTIFACT_DIR = Path("artifacts/regression")
-
-
-class InsufficientDataError(ValueError):
-    """Raised instead of training a model whose metrics would be meaningless."""
 
 
 @dataclass
@@ -117,19 +113,13 @@ def train_and_evaluate(
     test_fraction: float = 0.2,
     n_jobs: int = 1,
 ) -> tuple[RegressionReport, BaseEstimator]:
-    split: TemporalSplit = temporal_split(table, test_fraction)
-    inner = temporal_split(split.train, 0.25)
-    if len(inner.train) < MIN_TRAIN_ROWS or len(split.test) < MIN_TEST_ROWS:
-        raise InsufficientDataError(
-            f"need >= {MIN_TRAIN_ROWS} fit rows and >= {MIN_TEST_ROWS} test rows, "
-            f"got {len(inner.train)} and {len(split.test)}: not enough data to train meaningfully"
-        )
+    splits = model_splits(table, test_fraction)
 
     models = make_models(random_state, n_jobs=n_jobs)
-    X_fit, y_fit = features_and_target(inner.train, TARGET)
-    X_val, y_val = features_and_target(inner.test, TARGET)
-    X_train, y_train = features_and_target(split.train, TARGET)
-    X_test, y_test = features_and_target(split.test, TARGET)
+    X_fit, y_fit = features_and_target(splits.fit, TARGET)
+    X_val, y_val = features_and_target(splits.validation, TARGET)
+    X_train, y_train = features_and_target(splits.train, TARGET)
+    X_test, y_test = features_and_target(splits.test, TARGET)
 
     # 1-2. Select on validation; baselines are compared but never selected.
     _, val_scores = _fit_score(models, X_fit, y_fit, X_val, y_val)
@@ -153,8 +143,8 @@ def train_and_evaluate(
 
     report = RegressionReport(
         data_source=data_source, target=TARGET, n_rows=len(table), n_users=int(table["user_id"].nunique()),
-        n_fit=len(inner.train), n_validation=len(inner.test), n_train=len(split.train), n_test=len(split.test),
-        purged=split.purged + inner.purged, cutoff=str(split.cutoff),
+        n_fit=len(splits.fit), n_validation=len(splits.validation), n_train=len(splits.train),
+        n_test=len(splits.test), purged=splits.purged, cutoff=str(splits.cutoff),
         validation=val_scores, test=test_scores, selected_model=selected, best_baseline=best_baseline,
         beats_best_baseline=test_scores[selected]["mae"] < test_scores[best_baseline]["mae"],
         random_split_test=random_split, importances={k: float(v) for k, v in importances.items()},
@@ -164,33 +154,8 @@ def train_and_evaluate(
 
 def save(model: BaseEstimator, report: RegressionReport, out_dir: str | Path = DEFAULT_ARTIFACT_DIR) -> Path:
     """Persist the fitted model and its metadata side by side. Returns the model path."""
-    out = Path(out_dir)
-    out.mkdir(parents=True, exist_ok=True)
     stamp = report.trained_at.replace(":", "").replace("-", "")
-    model_path = out / f"{report.selected_model}_{report.data_source}_{stamp}.joblib"
-    joblib.dump(model, model_path)
-    meta = asdict(report)
-    meta["model_file"] = model_path.name
-    model_path.with_suffix(".json").write_text(json.dumps(meta, indent=2, default=float), encoding="utf-8")
-    return model_path
-
-
-def load_table(source: str, seed: int = 0) -> pd.DataFrame:
-    from ml.features import build_feature_table
-
-    if source == "synthetic":
-        from ml import synthetic
-        logs, rooms = synthetic.generate(seed=seed)
-        return build_feature_table(logs, rooms)
-
-    from analytics.dataset import load_dataset
-    from analytics.quality import engine_from_env
-    engine = engine_from_env()
-    if engine is None:
-        raise SystemExit("DATABASE_URL is not set.")
-    with engine.connect() as conn:
-        ds = load_dataset(conn)
-    return build_feature_table(ds.logs, ds.rooms)
+    return artifacts.save(model, asdict(report), out_dir, f"{report.selected_model}_{report.data_source}_{stamp}")
 
 
 def main(argv: list[str] | None = None) -> int:
