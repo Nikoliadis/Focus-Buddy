@@ -124,9 +124,10 @@ class TestProtocol:
     def test_logistic_recovers_ground_truth_directions(self, trained):
         """Generator: disciplined users, short sessions and weekdays finish more often."""
         c = trained[0].coefficients
-        assert c["prev_full_duration_rate"] < 0
+        assert c["prev_full_duration_rate_shrunk"] < 0
         assert c["planned_minutes"] > 0
-        assert c["is_weekend"] > 0
+        # weekday is one-hot with Monday as reference: Saturday and Sunday raise the odds
+        assert c["weekday_5"] > 0 and c["weekday_6"] > 0
 
     def test_single_class_refuses_to_train(self, table):
         one_class = table.assign(target_full_duration=1)

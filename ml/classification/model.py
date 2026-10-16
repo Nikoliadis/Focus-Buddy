@@ -8,15 +8,12 @@ from __future__ import annotations
 import numpy as np
 import pandas as pd
 from sklearn.base import BaseEstimator, ClassifierMixin
-from sklearn.compose import ColumnTransformer
 from sklearn.dummy import DummyClassifier
 from sklearn.ensemble import RandomForestClassifier
-from sklearn.impute import SimpleImputer
 from sklearn.linear_model import LogisticRegression
 from sklearn.pipeline import Pipeline
-from sklearn.preprocessing import StandardScaler
 
-from ml.regression.model import LINEAR_FEATURES
+from ml.pipelines import make_preprocessor
 
 
 def ended_early(table: pd.DataFrame) -> pd.Series:
@@ -40,20 +37,13 @@ class UserHistoryClassifier(ClassifierMixin, BaseEstimator):
         return (self.predict_proba(X)[:, 1] >= 0.5).astype(int)
 
 
-def make_logistic(class_weight: str | None = None, C: float = 1.0) -> Pipeline:
-    """Scaled logistic regression on the linear-safe features (cyclic hour, no raw categories).
+def make_logistic(class_weight: str | None = None, C: float = 1.0, hour_encoding: str = "onehot") -> Pipeline:
+    """Logistic regression on the full linear preprocessing (see ml.pipelines).
 
     Scaling matters twice here: the L2 penalty (strength 1/C) treats all coefficients alike,
     and standardised coefficients are comparable as "effect per 1 SD of the feature"."""
     return Pipeline([
-        ("prep", ColumnTransformer(
-            [("num", Pipeline([
-                ("impute", SimpleImputer(strategy="median", add_indicator=True)),
-                ("scale", StandardScaler()),
-            ]), LINEAR_FEATURES)],
-            remainder="drop",
-            verbose_feature_names_out=False,
-        )),
+        ("prep", make_preprocessor(hour_encoding)),
         ("model", LogisticRegression(C=C, class_weight=class_weight, max_iter=2000)),
     ])
 
@@ -77,7 +67,8 @@ def is_baseline(name: str) -> bool:
 
 
 def logistic_coefficients(model: Pipeline) -> pd.Series:
-    """Standardised coefficients (log-odds change per +1 SD), largest effect first."""
+    """Coefficients (log-odds change per +1 SD for scaled columns, vs the reference
+    category for one-hot columns), largest effect first."""
     names = model.named_steps["prep"].get_feature_names_out()
     coefs = pd.Series(model.named_steps["model"].coef_[0], index=names)
     return coefs.reindex(coefs.abs().sort_values(ascending=False).index)

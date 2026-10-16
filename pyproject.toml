@@ -10,6 +10,7 @@ addopts = "-ra --strict-markers"
 filterwarnings = [
     "ignore::DeprecationWarning",
     "ignore::gevent.monkey.MonkeyPatchWarning",
+    "ignore:Found unknown categories:UserWarning",
     "ignore::sqlalchemy.exc.LegacyAPIWarning",
 ]
 

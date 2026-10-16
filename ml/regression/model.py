@@ -8,21 +8,13 @@ from __future__ import annotations
 import numpy as np
 import pandas as pd
 from sklearn.base import BaseEstimator, RegressorMixin
-from sklearn.compose import ColumnTransformer
 from sklearn.dummy import DummyRegressor
 from sklearn.ensemble import RandomForestRegressor
-from sklearn.impute import SimpleImputer
 from sklearn.linear_model import LinearRegression
 from sklearn.pipeline import Pipeline
-from sklearn.preprocessing import StandardScaler
 
 from analytics.analysis import FULL_DURATION_THRESHOLD
-from ml.features import FEATURE_COLUMNS
-
-# Raw `hour` and `weekday` are categories stored as integers. A linear model would read
-# them as quantities (Sunday = 6 × Monday), so it gets the cyclic encoding instead.
-# One-hot encoding comes with the full preprocessing pipeline (Phase 11).
-LINEAR_FEATURES = [c for c in FEATURE_COLUMNS if c not in ("hour", "weekday")]
+from ml.pipelines import make_preprocessor
 
 
 class PlannedMinutesBaseline(RegressorMixin, BaseEstimator):
@@ -94,17 +86,9 @@ def make_models(random_state: int = 0, n_jobs: int = 1) -> dict[str, BaseEstimat
     """``n_jobs`` defaults to 1: joblib's parallel workers deadlock under gevent
     monkey-patching (which the web app applies), so parallelism must be opted into
     from a plain process such as the training CLI."""
-    linear = Pipeline([
-        ("prep", ColumnTransformer(
-            [("num", Pipeline([
-                # Medians are learned from the training data only, inside fit().
-                ("impute", SimpleImputer(strategy="median", add_indicator=True)),
-                ("scale", StandardScaler()),
-            ]), LINEAR_FEATURES)],
-            remainder="drop",
-        )),
-        ("model", LinearRegression()),
-    ])
+    # Linear models need explicit preprocessing (one-hot, log, imputation, scaling, shrinkage);
+    # see ml.pipelines. It is fitted inside the pipeline, so only on training rows.
+    linear = Pipeline([("prep", make_preprocessor()), ("model", LinearRegression())])
     forest = RandomForestRegressor(
         n_estimators=300,
         min_samples_leaf=5,   # no leaf predicts from fewer than 5 sessions: limits overfitting
