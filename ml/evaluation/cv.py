@@ -22,7 +22,7 @@ from collections.abc import Iterator
 import numpy as np
 import pandas as pd
 from sklearn.base import BaseEstimator, clone
-from sklearn.model_selection import GroupKFold
+from sklearn.model_selection import BaseCrossValidator, GroupKFold
 
 from ml.evaluation.tasks import Task
 from ml.features import FEATURE_COLUMNS
@@ -31,18 +31,50 @@ MIN_FOLD_TRAIN = 100
 MIN_FOLD_VALIDATION = 30
 
 
-def temporal_folds(table: pd.DataFrame, n_splits: int = 5) -> Iterator[tuple[pd.DataFrame, pd.DataFrame]]:
-    ordered = table.sort_values("as_of", kind="stable").reset_index(drop=True)
-    edges = np.linspace(0, len(ordered), n_splits + 2).astype(int)
+def temporal_fold_positions(
+    as_of: np.ndarray, label_available_at: np.ndarray, n_splits: int = 5,
+    min_train: int = MIN_FOLD_TRAIN, min_validation: int = MIN_FOLD_VALIDATION,
+) -> Iterator[tuple[np.ndarray, np.ndarray]]:
+    """Expanding-window folds as *row positions*, with purging. Shared by our CV and by
+    scikit-learn searches (via ``PurgedTemporalSplit``)."""
+    as_of, label_available_at = np.asarray(as_of), np.asarray(label_available_at)
+    order = np.argsort(as_of, kind="stable")
+    edges = np.linspace(0, len(order), n_splits + 2).astype(int)
     for i in range(1, n_splits + 1):
-        validation = ordered.iloc[edges[i]:edges[i + 1]]
-        if validation.empty:
+        val_pos = order[edges[i]:edges[i + 1]]
+        if val_pos.size == 0:
             continue
-        start = validation["as_of"].iloc[0]
-        train = ordered.iloc[:edges[i]]
-        train = train[train["label_available_at"] < start]
-        if len(train) >= MIN_FOLD_TRAIN and len(validation) >= MIN_FOLD_VALIDATION:
-            yield train, validation
+        start = as_of[val_pos].min()
+        train_pos = order[:edges[i]]
+        train_pos = train_pos[label_available_at[train_pos] < start]
+        if train_pos.size >= min_train and val_pos.size >= min_validation:
+            yield train_pos, val_pos
+
+
+def temporal_folds(table: pd.DataFrame, n_splits: int = 5) -> Iterator[tuple[pd.DataFrame, pd.DataFrame]]:
+    for train_pos, val_pos in temporal_fold_positions(
+        table["as_of"].to_numpy(), table["label_available_at"].to_numpy(), n_splits
+    ):
+        yield table.iloc[train_pos], table.iloc[val_pos]
+
+
+class PurgedTemporalSplit(BaseCrossValidator):
+    """scikit-learn CV splitter for GridSearchCV & co. Needs the timestamps of the rows,
+    in the same order as the X later passed to ``split``."""
+
+    def __init__(self, as_of, label_available_at, n_splits: int = 5):
+        self.as_of = np.asarray(as_of)
+        self.label_available_at = np.asarray(label_available_at)
+        self.n_splits = n_splits
+        self._folds = list(temporal_fold_positions(self.as_of, self.label_available_at, n_splits))
+
+    def split(self, X=None, y=None, groups=None):
+        if X is not None and len(X) != len(self.as_of):
+            raise ValueError("X must have the same rows, in the same order, as the timestamps")
+        yield from self._folds
+
+    def get_n_splits(self, X=None, y=None, groups=None) -> int:
+        return len(self._folds)
 
 
 def user_folds(table: pd.DataFrame, n_splits: int = 5) -> Iterator[tuple[pd.DataFrame, pd.DataFrame]]:
