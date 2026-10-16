@@ -6,3 +6,10 @@
 -r requirements-analytics.txt
 
 torch==2.14.1
+
+# Sentence embeddings (Phase 15). transformers/tokenizers/hub pinned for reproducibility.
+sentence-transformers==6.1.0
+transformers==5.17.0
+tokenizers==0.23.2
+huggingface-hub==1.33.0
+safetensors==0.8.0

@@ -50,17 +50,58 @@ def generate_chat(
         for _ in range(messages_per_room):
             message_id += 1
             r = rng.random()
+            term, kind = None, "chitchat"
             if r < topic_share:
-                term = TOPICS[topic][rng.integers(len(TOPICS[topic]))]
+                term, kind = TOPICS[topic][rng.integers(len(TOPICS[topic]))], "topic"
                 body = TOPIC_TEMPLATES[rng.integers(len(TOPIC_TEMPLATES))].format(t=term)
             elif r < 0.97:
                 body = CHITCHAT[rng.integers(len(CHITCHAT))].format(n=int(rng.choice([5, 10, 25, 50])))
             else:
+                kind = "noise"
                 body = NOISE[rng.integers(len(NOISE))].format(user=f"student{rng.integers(1000)}")
             rows.append({
                 "message_id": message_id, "room_id": room, "user_id": int(rng.choice(users)), "body": body,
                 "created_at": start + pd.Timedelta(minutes=int(rng.integers(0, 60 * 24 * 60))),
                 "room_is_private": False,
+                # ground truth, for evaluating retrieval
+                "kind": kind, "topic": topic if kind == "topic" else None, "term": term,
             })
     messages, _ = cleaning.clean_chat_messages(pd.DataFrame(rows), now=start + pd.Timedelta(days=90))
     return messages, room_topic
+
+
+# Retrieval evaluation queries, deliberately worded differently from the templates above
+# (paraphrases, the other language, descriptions instead of names).
+# ("term", t): relevant = messages mentioning term t; ("topic", t): relevant = messages on topic t.
+EVAL_QUERIES: list[tuple[str, str, str]] = [
+    ("Does anyone have notes on dijkstra?", "term", "dijkstra"),
+    ("shortest path between two nodes", "term", "dijkstra"),
+    ("πώς βρίσκω το συντομότερο μονοπάτι", "term", "dijkstra"),
+    ("help with normalization", "term", "normalization"),
+    ("normal forms of a relational schema", "term", "normalization"),
+    ("βοήθεια με κανονικές μορφές", "term", "κανονικοποίηση"),
+    ("my advisor wants changes", "term", "supervisor"),
+    ("τι είπε ο καθηγητής για την εργασία;", "term", "επιβλέπων"),
+    ("designing tables and writing queries", "topic", "databases"),
+    ("βάσεις δεδομένων και πίνακες", "topic", "databases"),
+    ("graphs, trees and running time", "topic", "algorithms"),
+    ("αλγόριθμοι και δομές δεδομένων", "topic", "algorithms"),
+    ("writing my dissertation", "topic", "thesis"),
+    ("γράφω την πτυχιακή μου", "topic", "thesis"),
+]
+
+# Terms that mean the same thing across languages count as the same target.
+TERM_ALIASES = {
+    "dijkstra": {"dijkstra"},
+    "normalization": {"normalization", "κανονικοποίηση", "BCNF"},
+    "κανονικοποίηση": {"normalization", "κανονικοποίηση", "BCNF"},
+    "supervisor": {"supervisor", "επιβλέπων"},
+    "επιβλέπων": {"supervisor", "επιβλέπων"},
+}
+
+
+def relevant_ids(messages: pd.DataFrame, kind: str, target: str) -> set[int]:
+    """Message ids that are correct answers for an evaluation query."""
+    if kind == "topic":
+        return set(messages.loc[messages["topic"] == target, "message_id"])
+    return set(messages.loc[messages["term"].isin(TERM_ALIASES.get(target, {target})), "message_id"])
