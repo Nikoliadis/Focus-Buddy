@@ -4,3 +4,4 @@
 pandas==3.0.6
 numpy==2.5.3
 tzdata==2026.4
+scipy==1.18.1

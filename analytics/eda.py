@@ -11,7 +11,7 @@ import sys
 
 import pandas as pd
 
-from analytics import analysis, statistics
+from analytics import analysis, inference, statistics
 from analytics.cleaning import DEFAULT_LOCAL_TZ
 from analytics.dataset import AnalyticsDataset, load_dataset
 from analytics.quality import engine_from_env
@@ -72,6 +72,19 @@ def build_eda(ds: AnalyticsDataset, tz: str = DEFAULT_LOCAL_TZ) -> str:
         rooms[["room_id", "is_private", "current_member_count", "sessions", "active_days", "total_hours"]]
         .head(10).round(1).to_string(index=False),
     ))
+
+    mean, lo, hi = inference.mean_ci(ds.logs.loc[ds.logs["quality"] == "ok", "focused_seconds"] / 60)
+    tests = {
+        "Weekend vs weekday session length, per user (paired)":
+            inference.weekend_vs_weekday(ds.logs, unit="user", tz=tz),
+        "Weekend vs weekday, per session (pseudo-replicated, for comparison)":
+            inference.weekend_vs_weekday(ds.logs, unit="session", tz=tz),
+        "User activity vs session length":
+            inference.activity_vs_session_length(ds.logs),
+    }
+    blocks = [f"Mean focused minutes: {mean:.2f} (95% CI [{lo:.2f}, {hi:.2f}])"]
+    blocks += [f"{title}:\n{result.summary()}" for title, result in tests.items()]
+    parts.append(_section("Statistical tests", "\n\n".join(blocks)))
 
     daily = analysis.daily_focus(ds.logs, tz=tz)
     last_days = daily.tail(14).assign(date=lambda d: pd.to_datetime(d["date"]).dt.date)
