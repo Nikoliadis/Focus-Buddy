@@ -15,7 +15,7 @@ filterwarnings = [
 ]
 
 [tool.coverage.run]
-source = ["app", "config", "auth", "main", "models", "rooms"]
+source = ["app", "config", "auth", "main", "models", "rooms", "analytics", "ml", "nlp"]
 branch = true
 
 [tool.coverage.report]
