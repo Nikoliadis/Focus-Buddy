@@ -1,0 +1,8 @@
+# Deep learning (PyTorch). CPU build by default: small, and what CI uses.
+# For an NVIDIA GPU, install the CUDA build instead, e.g.:
+#   pip install torch==2.14.1 --index-url https://download.pytorch.org/whl/cu128
+# The code picks the GPU automatically when one is available.
+--extra-index-url https://download.pytorch.org/whl/cpu
+-r requirements-analytics.txt
+
+torch==2.14.1
