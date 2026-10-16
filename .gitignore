@@ -52,3 +52,8 @@ Thumbs.db
 .coverage
 coverage.xml
 htmlcov/
+
+# =====================
+# Generated reports (may contain real user data)
+# =====================
+reports/

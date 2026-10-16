@@ -1,0 +1,5 @@
+# Jupyter for the notebooks/ folder. Notebooks only call the tested analytics modules.
+-r requirements-analytics.txt
+
+jupyterlab==4.6.3
+ipykernel==7.3.0
