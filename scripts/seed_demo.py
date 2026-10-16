@@ -82,8 +82,13 @@ def seed() -> None:
         return
 
     room = create_room(users["demo"].id, "Thesis Sprint")
-    create_room(users["maria"].id, "Databases Exam Prep")
-    create_room(users["giorgos"].id, "Late Night Coding")
+    other_rooms = [
+        create_room(users["maria"].id, "Databases Exam Prep"),
+        create_room(users["giorgos"].id, "Late Night Coding"),
+    ]
+    # Rooms must predate the focus history generated below.
+    for r in (room, *other_rooms):
+        r.created_at = datetime.utcnow() - timedelta(days=15)
     for name in USERNAMES[1:]:
         db.session.add(RoomMember(room_id=room.id, user_id=users[name].id))
 
