@@ -912,6 +912,16 @@
     box.scrollTop = box.scrollHeight;
   }
 
+  // Help articles FocusBot used for its answer (RAG). textContent only: never inject HTML.
+  function _aiSources(sources) {
+    const box = document.getElementById('ai-messages');
+    const note = document.createElement('div');
+    note.style.cssText = 'font-size:.72rem; opacity:.6; margin:-.2rem 0 .3rem .4rem;';
+    note.textContent = 'Sources: ' + sources.map(s => `[${s.n}] ${s.title}`).join(' · ');
+    box.appendChild(note);
+    box.scrollTop = box.scrollHeight;
+  }
+
   async function sendAI(e) {
     e.preventDefault();
     const input = document.getElementById('ai-input');
@@ -935,6 +945,7 @@
       const data = await res.json();
       if (data.reply) {
         _aiAppend('assistant', data.reply);
+        if (Array.isArray(data.sources) && data.sources.length) _aiSources(data.sources);
         _aiHistory.push({ role: 'assistant', content: data.reply });
       } else {
         _aiAppend('assistant', '⚠️ Sorry, something went wrong. Try again.');

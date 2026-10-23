@@ -1,8 +1,9 @@
 import csv
 import io
 import os
+from functools import lru_cache
 
-from flask import Response, jsonify, render_template, request, session
+from flask import Response, current_app, jsonify, render_template, request, session
 
 from main.auth_utils import login_required
 from main.db import db
@@ -132,15 +133,25 @@ def api_ai_chat():
     if not message or len(message) > 1000:
         return jsonify({"error": "Invalid message"}), 400
 
-    history = data.get("history") or []
-    history = history[-10:]
-    messages = [
-        {"role": m["role"], "content": m["content"]}
-        for m in history
-        if m.get("role") in ("user", "assistant") and m.get("content")
+    history = data.get("history") if isinstance(data.get("history"), list) else []
+    history = [
+        {"role": m["role"], "content": str(m["content"])}
+        for m in history[-10:]
+        if isinstance(m, dict) and m.get("role") in ("user", "assistant") and m.get("content")
     ]
-    messages.append({"role": "user", "content": message})
 
+    if rag_enabled():
+        rag = _rag_pipeline()
+        if rag is not None:
+            from ai.llm.client import LLMUnavailable
+
+            try:
+                return jsonify(rag.answer(message, history).to_json())
+            except LLMUnavailable:
+                current_app.logger.exception("FocusBot RAG request failed")
+                return jsonify({"error": "AI error"}), 500
+
+    messages = [*history, {"role": "user", "content": message}]
     try:
         from groq import Groq
         client = Groq(api_key=api_key)
@@ -151,5 +162,28 @@ def api_ai_chat():
         )
         reply = response.choices[0].message.content
         return jsonify({"reply": reply})
-    except Exception as e:
-        return jsonify({"error": "AI error", "detail": str(e)}), 500
+    except Exception:
+        # Log the cause server-side; never send provider error details to the browser.
+        current_app.logger.exception("FocusBot request failed")
+        return jsonify({"error": "AI error"}), 500
+
+
+def rag_enabled() -> bool:
+    """RAG needs sentence-transformers/torch, which the web image does not install by default."""
+    return os.getenv("FOCUSBOT_RAG") == "1"
+
+
+@lru_cache(maxsize=1)
+def _rag_pipeline():
+    """Built once per process. Loading the embedding model takes seconds and ~500 MB of RAM,
+    which is why Phase 19 moves this into a separate ML service. Returns None (plain FocusBot)
+    if the ML dependencies are not installed."""
+    try:
+        from ai.llm.client import GroqLLM
+        from ai.rag.pipeline import RAGPipeline
+        from ai.rag.retriever import KnowledgeRetriever
+        from nlp.embeddings import SentenceTransformerEmbedder
+    except ImportError:
+        current_app.logger.warning("FOCUSBOT_RAG=1 but ML dependencies are missing; using plain FocusBot")
+        return None
+    return RAGPipeline(KnowledgeRetriever(SentenceTransformerEmbedder(device="cpu")), GroqLLM())
