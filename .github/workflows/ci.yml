@@ -22,11 +22,11 @@ jobs:
       - run: ruff check --output-format=github .
 
   test:
-    name: Tests (PostgreSQL 16)
+    name: Tests (PostgreSQL 16 + pgvector)
     runs-on: ubuntu-latest
     services:
       postgres:
-        image: postgres:16-alpine
+        image: pgvector/pgvector:0.8.7-pg16
         env:
           POSTGRES_USER: focusbuddy
           POSTGRES_PASSWORD: focusbuddy
