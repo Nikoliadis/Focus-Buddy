@@ -28,7 +28,7 @@
 | **Synchronized Pomodoro** | Server-authoritative timer with focus/break cycles; everyone sees the same countdown |
 | **Live presence** | Online / last-seen indicators for every member, pushed over Socket.IO |
 | **Room chat** | Persistent chat history, owner moderation (mute / unmute / kick) |
-| **FocusBot AI** | Study assistant powered by Llama 3.1 through the Groq API, with conversation history |
+| **FocusBot AI** | Study assistant powered by OpenAI gpt-oss-20b on Groq, with grounded answers from help articles, citations and read-only tools for the user's own data |
 | **Voice & screen sharing** | Peer-to-peer WebRTC; the server only relays signaling, no media goes through it |
 | **Stats & leaderboard** | Daily/weekly totals, streaks, daily goals, per-room breakdown, CSV export |
 | **Accounts** | Email verification and password reset (Resend), rate-limited auth endpoints |
@@ -69,7 +69,7 @@ flowchart LR
     end
 
     DB[("PostgreSQL<br/>SQLAlchemy ORM")]
-    GROQ["Groq API<br/>Llama 3.1 8B"]
+    GROQ["Groq API<br/>gpt-oss-20b"]
     RESEND["Resend<br/>email API"]
 
     UI -->|"forms / fetch (CSRF-protected)"| HTTP
@@ -114,7 +114,7 @@ sequenceDiagram
 | Backend | Python 3.12, Flask 3, Flask-SocketIO, gevent |
 | Database | PostgreSQL 16, SQLAlchemy 2 (psycopg 3) |
 | Real-time | WebSockets (Socket.IO), WebRTC with STUN |
-| AI | Groq API, Llama 3.1 8B Instant |
+| AI | Groq API (gpt-oss-20b), RAG, structured outputs, tool calling |
 | Security | CSRF tokens, rate limiting (Flask-Limiter), hashed passwords, open-redirect protection |
 | Email | Resend API |
 | Testing | pytest, pytest-cov, Socket.IO test client |

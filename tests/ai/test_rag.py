@@ -8,11 +8,14 @@ import numpy as np
 import pandas as pd
 import pytest
 
+from ai.llm.client import LLMBadRequest, LLMResponse, LLMUnavailable, ToolCall
+from ai.llm.structured import GroundednessVerdict
 from ai.rag import evaluate as ev
 from ai.rag.knowledge import Chunk, chunk_markdown, load_knowledge
 from ai.rag.pipeline import RAGPipeline, check_citations
-from ai.rag.prompt import NO_SOURCES, SYSTEM_PROMPT, build_context, build_messages
+from ai.rag.prompt import NO_SOURCES, PROMPT_VERSION, SYSTEM_PROMPT, build_context, build_messages
 from ai.rag.retriever import KnowledgeRetriever, Retrieved
+from ai.rag.tools import ToolContext
 from nlp.embeddings import DEFAULT_MODEL, model_is_cached
 
 
@@ -28,14 +31,26 @@ class HashEmbedder:
         return out / np.where(n == 0, 1, n)
 
 
-class FakeLLM:
-    def __init__(self, reply: str = "Use the join code [1]."):
-        self.reply = reply
-        self.messages = None
+STRUCTURED = '{"answer": "Use the join code [1].", "answerable": true, "cited_sources": [1]}'
 
-    def complete(self, messages):
-        self.messages = messages
-        return self.reply
+
+class FakeLLM:
+    """Replies by request type; records every call with its keyword arguments."""
+
+    def __init__(self, reply: str = STRUCTURED, tool_calls=()):
+        self.reply = reply
+        self.tool_calls = tuple(tool_calls)
+        self.calls: list[dict] = []
+
+    def chat(self, messages, **kwargs):
+        self.calls.append({"messages": messages, **kwargs})
+        if kwargs.get("tools"):
+            return LLMResponse(tool_calls=self.tool_calls)
+        return LLMResponse(text=self.reply)
+
+    @property
+    def messages(self):
+        return self.calls[-1]["messages"]
 
 
 DOC = """# Rooms
@@ -172,27 +187,141 @@ class TestCitations:
         assert check_citations("Hello", 3) == ("Hello", set(), [])
 
 
+def make_pipeline(llm, min_similarity=0.0):
+    return RAGPipeline(KnowledgeRetriever(HashEmbedder(), chunk_markdown(DOC, "rooms"), min_similarity=min_similarity),
+                       llm)
+
+
+QUESTION = "How do I join with a join code and password?"
+
+
 class TestPipeline:
     def test_returns_only_cited_sources(self):
-        chunks = chunk_markdown(DOC, "rooms")
-        llm = FakeLLM("Use the join code [1].")
-        result = RAGPipeline(KnowledgeRetriever(HashEmbedder(), chunks, min_similarity=0.0), llm).answer(
-            "How do I join with a join code and password?")
+        llm = FakeLLM()
+        result = make_pipeline(llm).answer(QUESTION)
 
-        assert result.grounded
+        assert result.grounded and result.answerable is True
         assert [s["n"] for s in result.sources] == [1]
         assert result.sources[0]["title"] == "Rooms > Joining"
         assert "Sources:" in llm.messages[0]["content"]
-        assert set(result.latency_ms) == {"retrieval", "generation"}
+        assert set(result.latency_ms) == {"retrieval", "tools", "generation"}
+
+    def test_final_call_requests_the_schema_and_logs_the_prompt_version(self):
+        llm = FakeLLM()
+        make_pipeline(llm).answer(QUESTION)
+
+        call = llm.calls[-1]
+        assert call["response_format"]["json_schema"]["name"] == "GroundedAnswer"
+        assert call["prompt_version"] == PROMPT_VERSION and call["feature"] == "focusbot.answer"
+        assert "tools" not in call  # Groq does not allow tools and structured output together
+
+    def test_declining_shows_no_sources(self):
+        reply = '{"answer": "I do not know.", "answerable": false, "cited_sources": [1]}'
+        result = make_pipeline(FakeLLM(reply)).answer(QUESTION)
+
+        assert result.answerable is False and result.sources == []
+
+    def test_sources_listed_only_in_the_field_are_shown(self):
+        reply = '{"answer": "Use the join code.", "answerable": true, "cited_sources": [2]}'
+        assert [s["n"] for s in make_pipeline(FakeLLM(reply)).answer(QUESTION).sources] == [2]
+
+    def test_hallucinated_source_numbers_are_dropped(self):
+        reply = '{"answer": "Premium is 5 EUR [9].", "answerable": true, "cited_sources": [9, 1]}'
+        result = make_pipeline(FakeLLM(reply)).answer(QUESTION)
+
+        assert "[9]" not in result.answer and result.invalid_citations == [9]
+        assert [s["n"] for s in result.sources] == [1]
 
     def test_without_matching_sources_the_model_is_told_so(self):
-        llm = FakeLLM("I don't know.")
-        result = RAGPipeline(KnowledgeRetriever(HashEmbedder(), chunk_markdown(DOC, "rooms"), min_similarity=0.99),
-                             llm).answer("What is the capital of France?")
+        llm = FakeLLM('{"answer": "I do not know.", "answerable": false, "cited_sources": []}')
+        result = make_pipeline(llm, min_similarity=0.99).answer("What is the capital of France?")
 
         assert not result.grounded and result.sources == []
         assert NO_SOURCES in llm.messages[0]["content"]
-        assert result.to_json() == {"reply": "I don't know.", "sources": [], "grounded": False}
+        assert result.to_json() == {"reply": "I do not know.", "sources": [], "grounded": False,
+                                    "answerable": False, "tools_used": []}
+
+    def test_invalid_structured_output_falls_back_to_plain_text(self):
+        result = make_pipeline(FakeLLM("Plain answer [1].")).answer(QUESTION)
+
+        assert result.answer == "Plain answer [1]." and result.answerable is None
+        assert [s["n"] for s in result.sources] == [1]
+
+    def test_model_without_json_schema_support_falls_back(self):
+        class NoSchema(FakeLLM):
+            def chat(self, messages, **kwargs):
+                if kwargs.get("response_format"):
+                    raise LLMBadRequest("json_schema not supported")
+                return super().chat(messages, **kwargs)
+
+        assert make_pipeline(NoSchema("Plain.")).answer(QUESTION).answer == "Plain."
+
+    def test_outage_propagates(self):
+        class Down(FakeLLM):
+            def chat(self, messages, **kwargs):
+                raise LLMUnavailable("down")
+
+        with pytest.raises(LLMUnavailable):
+            make_pipeline(Down()).answer(QUESTION)
+
+
+class TestToolRound:
+    CALL = ToolCall("c1", "list_my_open_tasks", "{}")
+
+    def test_no_tools_for_anonymous_callers(self):
+        llm = FakeLLM()
+        make_pipeline(llm).answer(QUESTION)
+        assert len(llm.calls) == 1
+
+    def test_tool_result_is_injected_as_data(self, app, make_user):
+        from main.db import db
+        from models.todo import TodoItem
+
+        user = make_user()
+        db.session.add(TodoItem(user_id=user.id, body="Read chapter 3"))
+        db.session.commit()
+        llm = FakeLLM(tool_calls=[self.CALL])
+
+        result = make_pipeline(llm).answer("What is left on my list?", tool_context=ToolContext(user.id))
+
+        assert llm.calls[0]["tools"] and llm.calls[0]["feature"] == "focusbot.tools"
+        system = llm.calls[1]["messages"][0]["content"]
+        assert "User data" in system and "Read chapter 3" in system
+        assert result.tools_used == ["list_my_open_tasks"]
+
+    def test_no_tool_call_means_no_user_data(self):
+        llm = FakeLLM()
+        result = make_pipeline(llm).answer(QUESTION, tool_context=ToolContext(1))
+
+        assert "User data" not in llm.messages[0]["content"] and result.tools_used == []
+
+    def test_rejected_tool_round_still_answers(self):
+        class BadTools(FakeLLM):
+            def chat(self, messages, **kwargs):
+                if kwargs.get("tools"):
+                    raise LLMBadRequest("tool_use_failed")
+                return super().chat(messages, **kwargs)
+
+        result = make_pipeline(BadTools()).answer(QUESTION, tool_context=ToolContext(1))
+        assert result.answer == "Use the join code [1]." and result.tools_used == []
+
+
+class TestJudgeAndReport:
+    VERDICT = '{"supported": false, "unsupported_claims": ["Premium costs 5 EUR"]}'
+
+    def test_judge_returns_a_verdict(self):
+        verdict = ev.judge_answer(FakeLLM(self.VERDICT), "q", "[1] source", "Premium costs 5 EUR")
+
+        assert isinstance(verdict, GroundednessVerdict)
+        assert verdict.unsupported_claims == ["Premium costs 5 EUR"]
+
+    def test_generation_report(self):
+        questions = [("How do I join?", {"rooms#joining"}), ("Premium price?", None)]
+        report = ev.generation_report(make_pipeline(FakeLLM()), judge_llm=None, questions=questions)
+
+        assert report["model_answerable"].tolist() == [True, True]
+        assert report["answerable"].tolist() == [True, False]
+        assert "supported" not in report
 
 
 class TestEndpoint:
@@ -206,7 +335,8 @@ class TestEndpoint:
         from main import routes
 
         chunks = chunk_markdown(DOC, "rooms")
-        pipeline = RAGPipeline(KnowledgeRetriever(HashEmbedder(), chunks, min_similarity=0.0), FakeLLM())
+        llm = FakeLLM()
+        pipeline = RAGPipeline(KnowledgeRetriever(HashEmbedder(), chunks, min_similarity=0.0), llm)
         monkeypatch.setenv("FOCUSBOT_RAG", "1")
         monkeypatch.setattr(routes, "_rag_pipeline", lambda: pipeline)
 
@@ -214,13 +344,14 @@ class TestEndpoint:
 
         assert data["reply"] == "Use the join code [1]."
         assert data["sources"][0]["title"] == "Rooms > Joining"
+        assert data["answerable"] is True
+        assert llm.calls[0].get("tools")  # a logged-in user gets the tool round
 
     def test_rag_failure_does_not_leak_details(self, logged_in, monkeypatch):
-        from ai.llm.client import LLMUnavailable
         from main import routes
 
         class Broken:
-            def answer(self, *_):
+            def answer(self, *_, **__):
                 raise LLMUnavailable("secret upstream detail")
 
         monkeypatch.setenv("FOCUSBOT_RAG", "1")
@@ -230,6 +361,34 @@ class TestEndpoint:
 
         assert res.status_code == 500
         assert "secret" not in res.get_data(as_text=True)
+
+    @pytest.mark.parametrize(("error", "status"), [("LLMRateLimited", 429), ("LLMTimeout", 504),
+                                                   ("LLMBadRequest", 500)])
+    def test_llm_errors_map_to_http_status(self, logged_in, monkeypatch, error, status):
+        import ai.llm.client as c
+        from main import routes
+
+        class Broken:
+            def answer(self, *_, **__):
+                raise getattr(c, error)("detail")
+
+        monkeypatch.setenv("FOCUSBOT_RAG", "1")
+        monkeypatch.setattr(routes, "_rag_pipeline", lambda: Broken())
+
+        assert logged_in.post("/api/ai/chat", json={"message": "hi"}).status_code == status
+
+    def test_plain_mode_uses_the_configured_model(self, logged_in, monkeypatch):
+        from unittest.mock import patch
+
+        from tests.test_api import _fake_groq
+
+        monkeypatch.delenv("FOCUSBOT_MODEL", raising=False)
+        groq = _fake_groq("ok")
+        with patch("groq.Groq", groq):
+            logged_in.post("/api/ai/chat", json={"message": "hi"})
+
+        kwargs = groq.return_value.chat.completions.create.call_args.kwargs
+        assert kwargs["model"] == "openai/gpt-oss-20b" and kwargs["max_completion_tokens"] == 1024
 
     def test_plain_mode_error_no_longer_leaks_details(self, logged_in):
         from unittest.mock import MagicMock, patch

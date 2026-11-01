@@ -140,31 +140,26 @@ def api_ai_chat():
         if isinstance(m, dict) and m.get("role") in ("user", "assistant") and m.get("content")
     ]
 
-    if rag_enabled():
-        rag = _rag_pipeline()
-        if rag is not None:
-            from ai.llm.client import LLMUnavailable
+    from ai.llm.client import GroqLLM, LLMRateLimited, LLMTimeout, LLMUnavailable
 
-            try:
-                return jsonify(rag.answer(message, history).to_json())
-            except LLMUnavailable:
-                current_app.logger.exception("FocusBot RAG request failed")
-                return jsonify({"error": "AI error"}), 500
-
-    messages = [*history, {"role": "user", "content": message}]
     try:
-        from groq import Groq
-        client = Groq(api_key=api_key)
-        response = client.chat.completions.create(
-            model="llama-3.1-8b-instant",
-            max_tokens=512,
-            messages=[{"role": "system", "content": _AI_SYSTEM}] + messages,
-        )
-        reply = response.choices[0].message.content
+        rag = _rag_pipeline() if rag_enabled() else None
+        if rag is not None:
+            from ai.rag.tools import ToolContext
+
+            answer = rag.answer(message, history, tool_context=ToolContext(session["user_id"]))
+            return jsonify(answer.to_json())
+
+        messages = [{"role": "system", "content": _AI_SYSTEM}, *history, {"role": "user", "content": message}]
+        reply = GroqLLM(temperature=0.7, api_key=api_key).chat(messages, feature="focusbot.plain").text
         return jsonify({"reply": reply})
-    except Exception:
+    except LLMUnavailable as exc:
         # Log the cause server-side; never send provider error details to the browser.
         current_app.logger.exception("FocusBot request failed")
+        if isinstance(exc, LLMRateLimited):
+            return jsonify({"error": "FocusBot is busy, try again in a minute"}), 429
+        if isinstance(exc, LLMTimeout):
+            return jsonify({"error": "FocusBot took too long, try again"}), 504
         return jsonify({"error": "AI error"}), 500
 
 
