@@ -51,6 +51,9 @@ class TestTokenize:
         tokens = tokenize("Το SQL και the JOIN είναι kai join")
         assert tokens == ["sql", "join", "join"]
 
+    def test_greek_articles_are_stopwords(self):
+        assert tokenize("τις σημειώσεις") == ["σημειωσεισ"]
+
     def test_accented_stopword_matches(self):
         assert "ειναι" in STOPWORDS and tokenize("Είναι") == []
 

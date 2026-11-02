@@ -6,6 +6,7 @@ project produced.
 from __future__ import annotations
 
 import json
+from collections.abc import Sequence
 from pathlib import Path
 from typing import Any
 
@@ -26,9 +27,11 @@ def save(model: BaseEstimator, metadata: dict[str, Any], out_dir: str | Path, na
     return model_path
 
 
-def load(model_path: str | Path) -> tuple[BaseEstimator, dict[str, Any]]:
+def load(
+    model_path: str | Path, expected_features: Sequence[str] = FEATURE_COLUMNS
+) -> tuple[BaseEstimator, dict[str, Any]]:
     path = Path(model_path)
     meta = json.loads(path.with_suffix(".json").read_text(encoding="utf-8"))
-    if meta["features"] != list(FEATURE_COLUMNS):
+    if meta["features"] != list(expected_features):
         raise ValueError("model was trained on a different feature set; retrain it")
     return joblib.load(path), meta

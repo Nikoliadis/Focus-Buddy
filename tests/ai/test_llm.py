@@ -192,6 +192,17 @@ class TestTelemetry:
         assert record["feature"] == "f" and record["prompt_version"] == "v1"
         assert "private" not in caplog.text
 
+    def test_info_records_really_reach_a_handler(self):
+        """Python drops INFO by default; the entry points must turn it on."""
+        from ai.llm.telemetry import configure_logging
+
+        configure_logging()
+        configure_logging()  # idempotent
+
+        root = logging.getLogger("focusbuddy")
+        assert logging.getLogger("focusbuddy.llm").isEnabledFor(logging.INFO)
+        assert sum(isinstance(h, logging.StreamHandler) for h in root.handlers) == 1
+
     def test_percentiles(self):
         usage = UsageTracker()
         for ms in range(1, 101):

@@ -1,7 +1,6 @@
 import csv
 import io
 import os
-from functools import lru_cache
 
 from flask import Response, current_app, jsonify, render_template, request, session
 
@@ -124,10 +123,6 @@ def api_todos_delete(item_id: int):
 @login_required
 @limiter.limit("20 per minute")
 def api_ai_chat():
-    api_key = os.getenv("GROQ_API_KEY", "")
-    if not api_key:
-        return jsonify({"error": "AI not configured"}), 503
-
     data = request.get_json(silent=True) or {}
     message = (data.get("message") or "").strip()
     if not message or len(message) > 1000:
@@ -140,16 +135,18 @@ def api_ai_chat():
         if isinstance(m, dict) and m.get("role") in ("user", "assistant") and m.get("content")
     ]
 
+    if os.getenv("ML_SERVICE_URL"):
+        response = _ask_ml_service(message, history, session["user_id"])
+        if response is not None:
+            return response
+
+    api_key = os.getenv("GROQ_API_KEY", "")
+    if not api_key:
+        return jsonify({"error": "AI not configured"}), 503
+
     from ai.llm.client import GroqLLM, LLMRateLimited, LLMTimeout, LLMUnavailable
 
     try:
-        rag = _rag_pipeline() if rag_enabled() else None
-        if rag is not None:
-            from ai.rag.tools import ToolContext
-
-            answer = rag.answer(message, history, tool_context=ToolContext(session["user_id"]))
-            return jsonify(answer.to_json())
-
         messages = [{"role": "system", "content": _AI_SYSTEM}, *history, {"role": "user", "content": message}]
         reply = GroqLLM(temperature=0.7, api_key=api_key).chat(messages, feature="focusbot.plain").text
         return jsonify({"reply": reply})
@@ -163,22 +160,25 @@ def api_ai_chat():
         return jsonify({"error": "AI error"}), 500
 
 
-def rag_enabled() -> bool:
-    """RAG needs sentence-transformers/torch, which the web image does not install by default."""
-    return os.getenv("FOCUSBOT_RAG") == "1"
+def _ask_ml_service(message: str, history: list[dict], user_id: int):
+    """Ask the ML service for a grounded answer. Returns a Flask response, or None to fall back
+    to plain FocusBot: an ML outage should not take the assistant down with it. Embeddings and
+    torch stay out of this gevent process, where CPU work would stall every WebSocket."""
+    import httpx
 
-
-@lru_cache(maxsize=1)
-def _rag_pipeline():
-    """Built once per process. Loading the embedding model takes seconds and ~500 MB of RAM,
-    which is why Phase 19 moves this into a separate ML service. Returns None (plain FocusBot)
-    if the ML dependencies are not installed."""
     try:
-        from ai.llm.client import GroqLLM
-        from ai.rag.pipeline import RAGPipeline
-        from ai.rag.retriever import KnowledgeRetriever
-        from nlp.embeddings import SentenceTransformerEmbedder
-    except ImportError:
-        current_app.logger.warning("FOCUSBOT_RAG=1 but ML dependencies are missing; using plain FocusBot")
+        reply = httpx.post(
+            f"{os.environ['ML_SERVICE_URL'].rstrip('/')}/rag/query",
+            json={"question": message, "history": history, "user_id": user_id},
+            headers={"X-API-Key": os.getenv("ML_API_KEY", "")},
+            timeout=60.0,
+        )
+    except httpx.HTTPError:
+        current_app.logger.warning("ML service unreachable; using plain FocusBot")
         return None
-    return RAGPipeline(KnowledgeRetriever(SentenceTransformerEmbedder(device="cpu")), GroqLLM())
+    if reply.status_code == 200:
+        return jsonify(reply.json())
+    if reply.status_code == 429:
+        return jsonify({"error": "FocusBot is busy, try again in a minute"}), 429
+    current_app.logger.warning("ML service returned %s; using plain FocusBot", reply.status_code)
+    return None

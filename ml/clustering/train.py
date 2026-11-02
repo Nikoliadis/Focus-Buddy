@@ -145,8 +145,8 @@ def main(argv: list[str] | None = None) -> int:
     print(analyze.report_text(report, users, labels))
     if not args.no_save:
         stamp = report.trained_at.replace(":", "").replace("-", "")
-        meta = {**asdict(report), "features": list(USER_FEATURES)}
-        # artifacts.load checks the *session* feature list; clustering models are loaded with joblib directly.
+        meta = {**asdict(report), "features": list(USER_FEATURES), "weak_structure": report.weak_structure,
+                "descriptions": {str(c): text for c, text in analyze.describe(users, labels).items()}}
         path = artifacts.save(model, meta, args.out, f"kmeans_k{report.k}_{report.data_source}_{stamp}")
         fig = analyze.profile_heatmap(users, labels)
         fig.savefig(path.with_suffix(".png"))

@@ -1,0 +1,6 @@
+# ML service (FastAPI). Everything the models need to load and answer.
+-r requirements-dl.txt
+
+fastapi==0.146.0
+starlette==1.8.0
+uvicorn==0.54.0

@@ -29,6 +29,9 @@ services:
       # Optional: FocusBot and transactional emails stay disabled when these are empty
       GROQ_API_KEY: "${GROQ_API_KEY:-}"
       FOCUSBOT_MODEL: "${FOCUSBOT_MODEL:-openai/gpt-oss-20b}"
+      # Set ML_SERVICE_URL=http://ml:8000 together with `--profile ml` to use the ML service.
+      ML_SERVICE_URL: "${ML_SERVICE_URL:-}"
+      ML_API_KEY: "${ML_API_KEY:-}"
       RESEND_API_KEY: "${RESEND_API_KEY:-}"
     ports:
       - "${WEB_PORT:-5000}:5000"
@@ -36,5 +39,26 @@ services:
       db:
         condition: service_healthy
 
+  ml:
+    # Model serving. Heavy (torch, ~500 MB of RAM once loaded), so it starts only on request:
+    #   docker compose --profile ml up --build
+    profiles: ["ml"]
+    build:
+      context: .
+      dockerfile: Dockerfile.ml
+    environment:
+      ML_API_KEY: "${ML_API_KEY:-}"
+      DATABASE_URL: "postgresql+psycopg://focusbuddy:focusbuddy_pass@db:5432/focusbuddy"
+      GROQ_API_KEY: "${GROQ_API_KEY:-}"
+      FOCUSBOT_MODEL: "${FOCUSBOT_MODEL:-openai/gpt-oss-20b}"
+    volumes:
+      - ./artifacts:/app/artifacts:ro      # models are trained elsewhere; the service only reads them
+      - hf_cache:/root/.cache/huggingface  # keeps the embedding model across restarts
+    # No published port: only the web app, on the compose network, can reach it.
+    depends_on:
+      db:
+        condition: service_healthy
+
 volumes:
+  hf_cache:
   pgdata:

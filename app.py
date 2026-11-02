@@ -11,6 +11,7 @@ from datetime import datetime
 from flask import Flask, abort, render_template, request
 
 import rooms.sockets
+from ai.llm.telemetry import configure_logging
 from auth import auth_bp
 from config import Config
 from main import main_bp
@@ -27,6 +28,7 @@ from rooms import rooms_bp
 
 
 def create_app(test_config: dict | None = None) -> Flask:
+    configure_logging()
     app = Flask(__name__)
     app.config.from_object(Config)
     if test_config:

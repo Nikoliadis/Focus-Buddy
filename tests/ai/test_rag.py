@@ -325,57 +325,105 @@ class TestJudgeAndReport:
 
 
 class TestEndpoint:
+    """The web app talks to the ML service over HTTP and survives its outages."""
+
     @pytest.fixture()
     def logged_in(self, client, login, make_user, monkeypatch):
         monkeypatch.setenv("GROQ_API_KEY", "test-key")
+        monkeypatch.delenv("ML_SERVICE_URL", raising=False)
         login(make_user())
         return client
 
-    def test_rag_mode_returns_sources(self, logged_in, monkeypatch):
-        from main import routes
+    @pytest.fixture()
+    def with_service(self, logged_in, monkeypatch):
+        monkeypatch.setenv("ML_SERVICE_URL", "http://ml:8000/")
+        monkeypatch.setenv("ML_API_KEY", "shared-secret")
+        return logged_in
 
-        chunks = chunk_markdown(DOC, "rooms")
-        llm = FakeLLM()
-        pipeline = RAGPipeline(KnowledgeRetriever(HashEmbedder(), chunks, min_similarity=0.0), llm)
-        monkeypatch.setenv("FOCUSBOT_RAG", "1")
-        monkeypatch.setattr(routes, "_rag_pipeline", lambda: pipeline)
+    def test_service_answer_is_returned(self, with_service, monkeypatch, make_user):
+        import httpx
 
-        data = logged_in.post("/api/ai/chat", json={"message": "how do I join with a code?"}).get_json()
+        seen = {}
+        payload = {"reply": "Use the code [1].", "sources": [{"n": 1, "title": "Rooms > Joining", "similarity": 0.8}],
+                   "grounded": True, "answerable": True, "tools_used": []}
 
-        assert data["reply"] == "Use the join code [1]."
-        assert data["sources"][0]["title"] == "Rooms > Joining"
-        assert data["answerable"] is True
-        assert llm.calls[0].get("tools")  # a logged-in user gets the tool round
+        def post(url, **kwargs):
+            seen.update(url=url, **kwargs)
+            return httpx.Response(200, json=payload)
 
-    def test_rag_failure_does_not_leak_details(self, logged_in, monkeypatch):
-        from main import routes
+        monkeypatch.setattr(httpx, "post", post)
+        history = [{"role": "user", "content": "hi"}]
 
-        class Broken:
-            def answer(self, *_, **__):
-                raise LLMUnavailable("secret upstream detail")
+        data = with_service.post("/api/ai/chat", json={"message": "how?", "history": history}).get_json()
 
-        monkeypatch.setenv("FOCUSBOT_RAG", "1")
-        monkeypatch.setattr(routes, "_rag_pipeline", lambda: Broken())
+        assert data == payload
+        assert seen["url"] == "http://ml:8000/rag/query"
+        assert seen["headers"] == {"X-API-Key": "shared-secret"}
+        assert seen["json"]["question"] == "how?" and seen["json"]["history"] == history
+        assert seen["timeout"] > 0
 
-        res = logged_in.post("/api/ai/chat", json={"message": "hi"})
+    def test_user_id_comes_from_the_session_not_the_client(self, with_service, monkeypatch):
+        import httpx
 
-        assert res.status_code == 500
-        assert "secret" not in res.get_data(as_text=True)
+        seen = {}
 
-    @pytest.mark.parametrize(("error", "status"), [("LLMRateLimited", 429), ("LLMTimeout", 504),
-                                                   ("LLMBadRequest", 500)])
-    def test_llm_errors_map_to_http_status(self, logged_in, monkeypatch, error, status):
-        import ai.llm.client as c
-        from main import routes
+        def post(url, **kwargs):
+            seen.update(kwargs["json"])
+            return httpx.Response(200, json={"reply": "ok"})
 
-        class Broken:
-            def answer(self, *_, **__):
-                raise getattr(c, error)("detail")
+        monkeypatch.setattr(httpx, "post", post)
+        with with_service.session_transaction() as sess:
+            real_user = sess["user_id"]
 
-        monkeypatch.setenv("FOCUSBOT_RAG", "1")
-        monkeypatch.setattr(routes, "_rag_pipeline", lambda: Broken())
+        with_service.post("/api/ai/chat", json={"message": "hi", "user_id": real_user + 999})
 
-        assert logged_in.post("/api/ai/chat", json={"message": "hi"}).status_code == status
+        assert seen["user_id"] == real_user
+
+    @pytest.mark.parametrize("failure", ["unreachable", "server_error", "unauthorized"])
+    def test_service_outage_falls_back_to_plain_focusbot(self, with_service, monkeypatch, failure):
+        from unittest.mock import patch
+
+        import httpx
+
+        from tests.test_api import _fake_groq
+
+        def post(url, **kwargs):
+            if failure == "unreachable":
+                raise httpx.ConnectError("down")
+            return httpx.Response(500 if failure == "server_error" else 401, json={"detail": "x"})
+
+        monkeypatch.setattr(httpx, "post", post)
+        with patch("groq.Groq", _fake_groq("plain answer")):
+            res = with_service.post("/api/ai/chat", json={"message": "hi"})
+
+        assert res.status_code == 200 and res.get_json() == {"reply": "plain answer"}
+
+    def test_service_rate_limit_is_passed_on(self, with_service, monkeypatch):
+        import httpx
+
+        monkeypatch.setattr(httpx, "post", lambda url, **kw: httpx.Response(429, json={"detail": "busy"}))
+        assert with_service.post("/api/ai/chat", json={"message": "hi"}).status_code == 429
+
+    def test_service_works_without_a_groq_key_on_the_web_app(self, with_service, monkeypatch):
+        import httpx
+
+        monkeypatch.delenv("GROQ_API_KEY")
+        monkeypatch.setattr(httpx, "post", lambda url, **kw: httpx.Response(200, json={"reply": "ok"}))
+        assert with_service.post("/api/ai/chat", json={"message": "hi"}).status_code == 200
+
+    def test_no_service_configured_never_calls_it(self, logged_in, monkeypatch):
+        from unittest.mock import patch
+
+        import httpx
+
+        from tests.test_api import _fake_groq
+
+        def post(url, **kwargs):
+            raise AssertionError("called the ML service")
+
+        monkeypatch.setattr(httpx, "post", post)
+        with patch("groq.Groq", _fake_groq("plain")):
+            assert logged_in.post("/api/ai/chat", json={"message": "hi"}).get_json() == {"reply": "plain"}
 
     def test_plain_mode_uses_the_configured_model(self, logged_in, monkeypatch):
         from unittest.mock import patch

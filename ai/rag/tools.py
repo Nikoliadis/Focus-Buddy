@@ -15,6 +15,7 @@ from __future__ import annotations
 import json
 import logging
 from collections.abc import Callable
+from contextlib import nullcontext
 from dataclasses import dataclass
 
 from pydantic import BaseModel, ConfigDict, Field, ValidationError
@@ -29,6 +30,9 @@ MAX_CALLS_PER_QUESTION = 3
 @dataclass(frozen=True)
 class ToolContext:
     user_id: int
+    # Opens what the handlers need for database access, around each tool run only, so no
+    # connection is held during the slow LLM call. The ML service passes a Flask app context.
+    scope: Callable = nullcontext
 
 
 class NoArguments(BaseModel):
@@ -96,7 +100,8 @@ def run_tool_call(call: ToolCall, ctx: ToolContext) -> dict:
     except (json.JSONDecodeError, ValidationError):
         return {"error": "invalid arguments"}
     try:
-        return tool.handler(ctx, args)
+        with ctx.scope():
+            return tool.handler(ctx, args)
     except Exception:  # noqa: BLE001 - one failed tool must not lose the whole answer
         logger.exception("tool %s failed", call.name)
         return {"error": "this data is temporarily unavailable"}

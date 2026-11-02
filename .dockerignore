@@ -12,7 +12,10 @@ __pycache__
 coverage.xml
 htmlcov
 tests
+tests_service
 docs
 CRF_Settings
 .vscode
 .idea
+artifacts
+reports

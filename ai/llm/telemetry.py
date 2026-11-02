@@ -21,6 +21,18 @@ logger = logging.getLogger("focusbuddy.llm")
 PRICES = {"openai/gpt-oss-20b": (0.075, 0.30), "openai/gpt-oss-120b": (0.15, 0.60)}
 
 
+def configure_logging() -> None:
+    """Send INFO records of the ``focusbuddy.*`` loggers to stderr. Python's default drops INFO,
+    so without this the JSON records above go nowhere. Called once by each process entry point;
+    library code never configures logging. Safe to call twice."""
+    root = logging.getLogger("focusbuddy")
+    root.setLevel(logging.INFO)
+    if not root.handlers:
+        handler = logging.StreamHandler()
+        handler.setFormatter(logging.Formatter("%(asctime)s %(name)s %(levelname)s %(message)s"))
+        root.addHandler(handler)
+
+
 def estimate_cost(model: str, prompt_tokens: int, completion_tokens: int) -> float | None:
     """Estimated USD, or None for a model without a known price."""
     if model not in PRICES:
